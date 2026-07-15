@@ -1,0 +1,50 @@
+name: Publish to PyPI
+
+# Triggers on a GitHub Release being published, not on every push -- a
+# release is a deliberate, human action, and PyPI publishes are
+# effectively irreversible (a version number can never be reused, even
+# if yanked). Tag the release vX.Y.Z to match pyproject.toml's version.
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: pip install build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Validate metadata
+        run: twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # id-token: write is what makes this "trusted publishing" -- PyPI
+      # verifies this workflow's OIDC identity directly, no API token
+      # stored as a repo secret, nothing to rotate or leak.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
