@@ -4,11 +4,6 @@
   </a>
 </p>
 
-
-(`[explicit]` / `[inferred]` / `[heuristic]` mark confidence in that step of
-the chain -- spelled out rather than left as a symbol you'd need this README
-open to decode.)
-
 ## Two tiers, one function
 
 **Tier 1 -- zero configuration.** `why(some_exception)` reassembles a causal
