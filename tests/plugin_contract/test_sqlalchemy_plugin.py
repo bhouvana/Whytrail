@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 sa = pytest.importorskip("sqlalchemy")
-pytest.importorskip("whytrail_sqlalchemy")
+pytest.importorskip("whytrail.integrations.sqlalchemy")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

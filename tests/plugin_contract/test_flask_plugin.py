@@ -10,9 +10,9 @@ import logging
 import pytest
 
 flask = pytest.importorskip("flask")
-pytest.importorskip("whytrail_flask")
+pytest.importorskip("whytrail.integrations.flask")
 
-import whytrail_flask  # noqa: E402
+import whytrail.integrations.flask as whytrail_flask  # noqa: E402
 from flask import Flask  # noqa: E402
 
 SECRET = "sk-super-secret-token"

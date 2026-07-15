@@ -9,12 +9,12 @@ import logging
 import pytest
 
 dramatiq = pytest.importorskip("dramatiq")
-pytest.importorskip("whytrail_dramatiq")
+pytest.importorskip("whytrail.integrations.dramatiq")
 
 from dramatiq.brokers.stub import StubBroker  # noqa: E402
 from dramatiq.worker import Worker  # noqa: E402
 
-import whytrail_dramatiq  # noqa: E402
+import whytrail.integrations.dramatiq as whytrail_dramatiq  # noqa: E402
 
 SECRET = "sk-super-secret-token"
 

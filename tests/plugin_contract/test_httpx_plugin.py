@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 httpx = pytest.importorskip("httpx")
-pytest.importorskip("whytrail_httpx")
+pytest.importorskip("whytrail.integrations.httpx")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

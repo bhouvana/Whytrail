@@ -11,7 +11,7 @@ from concurrent import futures
 import pytest
 
 grpc = pytest.importorskip("grpc")
-pytest.importorskip("whytrail_grpcio")
+pytest.importorskip("whytrail.integrations.grpcio")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

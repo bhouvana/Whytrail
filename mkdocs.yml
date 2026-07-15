@@ -22,6 +22,7 @@ nav:
       - "0003 - Ecosystem scale triage": adr/0003-ecosystem-scale-triage.md
       - "0004 - Rename to whytrail": adr/0004-rename-to-whytrail.md
       - "0005 - VS Code extension scope assessment": adr/0005-vscode-extension-scope.md
+      - "0006 - Unify plugins into extras": adr/0006-unify-plugins-into-extras.md
   - Changelog: changelog.md
 
 theme:

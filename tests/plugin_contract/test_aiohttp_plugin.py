@@ -11,7 +11,7 @@ import asyncio
 import pytest
 
 aiohttp = pytest.importorskip("aiohttp")
-pytest.importorskip("whytrail_aiohttp")
+pytest.importorskip("whytrail.integrations.aiohttp")
 
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402

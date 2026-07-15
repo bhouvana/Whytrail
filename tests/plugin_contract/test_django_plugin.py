@@ -11,7 +11,7 @@ import logging
 import pytest
 
 django = pytest.importorskip("django")
-pytest.importorskip("whytrail_django")
+pytest.importorskip("whytrail.integrations.django")
 
 import django.conf  # noqa: E402
 
@@ -22,7 +22,7 @@ if not django.conf.settings.configured:
 from django.test import RequestFactory  # noqa: E402
 from django.test.utils import override_settings  # noqa: E402
 
-import whytrail_django  # noqa: E402
+import whytrail.integrations.django as whytrail_django  # noqa: E402
 
 SECRET = "sk-super-secret-token"
 

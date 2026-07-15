@@ -8,7 +8,7 @@ import pytest
 
 anthropic = pytest.importorskip("anthropic")
 httpx = pytest.importorskip("httpx")
-pytest.importorskip("whytrail_anthropic")
+pytest.importorskip("whytrail.integrations.anthropic")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

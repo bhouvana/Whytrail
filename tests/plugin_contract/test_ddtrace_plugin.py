@@ -7,10 +7,10 @@ from __future__ import annotations
 import pytest
 
 pytest.importorskip("ddtrace")
-pytest.importorskip("whytrail_ddtrace")
+pytest.importorskip("whytrail.integrations.ddtrace")
 
 import whytrail  # noqa: E402
-import whytrail_ddtrace  # noqa: E402
+import whytrail.integrations.ddtrace as whytrail_ddtrace  # noqa: E402
 from ddtrace.trace import tracer  # noqa: E402
 
 SECRET = "sk-super-secret-token"

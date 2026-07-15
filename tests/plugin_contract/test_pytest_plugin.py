@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("whytrail_pytest")
+pytest.importorskip("whytrail.integrations.pytest_plugin")
 
 
 FAILING_TEST = """

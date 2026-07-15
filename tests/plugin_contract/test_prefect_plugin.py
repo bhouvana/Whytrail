@@ -10,11 +10,11 @@ import logging
 import pytest
 
 prefect = pytest.importorskip("prefect")
-pytest.importorskip("whytrail_prefect")
+pytest.importorskip("whytrail.integrations.prefect")
 
 from prefect import flow, task  # noqa: E402
 
-from whytrail_prefect import on_failure_hook  # noqa: E402
+from whytrail.integrations.prefect import on_failure_hook  # noqa: E402
 
 
 class _ListHandler(logging.Handler):

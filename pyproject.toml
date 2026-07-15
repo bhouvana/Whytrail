@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "whytrail"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python tells you where. whytrail tells you why."
 readme = "README.md"
 license = "MIT"
@@ -29,6 +29,55 @@ dependencies = []
 rich = ["rich>=13.0"]
 cli = ["rich>=13.0"]
 otel = ["opentelemetry-api>=1.20"]
+
+# Explainer-shaped integrations (ADR 0006): each pulls in exactly one
+# third-party library. Once installed, why() picks it up automatically
+# and lazily the first time it's actually needed
+# (src/whytrail/registry.py's _load_builtin_explainers()) -- installing
+# the extra is the only step, no entry point or manual register() call.
+requests = ["requests>=2.20"]
+httpx = ["httpx>=0.27"]
+aiohttp = ["aiohttp>=3.9"]
+huggingface-hub = ["huggingface_hub>=0.20"]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.30"]
+boto3 = ["boto3>=1.34"]
+google-cloud = ["google-api-core>=2.15"]
+sqlalchemy = ["sqlalchemy>=2.0"]
+asyncpg = ["asyncpg>=0.29"]
+pymongo = ["pymongo>=4.0"]
+grpcio = ["grpcio>=1.60"]
+pydantic = ["pydantic>=2.0"]
+marshmallow = ["marshmallow>=3.0"]
+jsonschema = ["jsonschema>=4.0"]
+pyyaml = ["pyyaml>=6.0"]
+pandas = ["pandas>=2.0"]
+polars = ["polars>=0.20"]
+
+# Integration-shaped (hook/middleware/signal-based, ADR 0006): the extra
+# only pulls in the dependency -- nothing auto-registers, since these
+# need explicit wiring (an on_failure=[...] hook, a middleware class,
+# before_send=...). See docs/plugin-guide.md.
+sentry = ["sentry-sdk>=2.0"]
+ddtrace = ["ddtrace>=2.0"]
+celery = ["celery>=5.3"]
+rq = ["rq>=1.15"]
+dramatiq = ["dramatiq>=1.14"]
+prefect = ["prefect>=2.14"]
+scrapy = ["scrapy>=2.8"]
+pytest = ["pytest>=7.0"]
+fastapi = ["starlette>=0.36"]
+django = ["django>=4.2"]
+flask = ["flask>=2.3"]
+langchain = ["langchain-core>=0.2"]
+
+# Every integration above in one install, for trying whytrail broadly or
+# CI matrices -- not meant as a typical user's default (see ADR 0006 for
+# why each stays its own extra instead of always installing everything).
+all = [
+    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain]",
+]
+
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
@@ -46,6 +95,18 @@ docs = [
 [project.scripts]
 whytrail = "whytrail.cli.__main__:main"
 
+[project.entry-points.pytest11]
+# pytest's own plugin discovery, independent of whytrail's registry --
+# pytest scans this group at startup and loads the module unconditionally
+# whenever whytrail is installed. Harmless without the `pytest` extra
+# (the module only does anything once pytest itself is actually running,
+# which means pytest is already present): a project that has both
+# whytrail and pytest installed gets the failure-report integration
+# automatically, with an opt-out flag (--no-whytrail) rather than a
+# separate extra to remember. See ADR 0006 and
+# src/whytrail/integrations/pytest_plugin.py.
+whytrail = "whytrail.integrations.pytest_plugin"
+
 [project.urls]
 Homepage = "https://github.com/bhouvana/Whytrail"
 Documentation = "https://bhouvana.github.io/Whytrail/"
@@ -61,10 +122,16 @@ addopts = "-ra"
 [tool.mypy]
 strict = true
 files = ["src/whytrail"]
+exclude = ["^src/whytrail/integrations/"]
 python_version = "3.12"
-# Plugins are checked individually in CI (each needs its own third-party
-# stubs/dependency installed to type-check meaningfully); this default
-# scope covers what every contributor should run locally before a core PR.
+# The 30 modules under integrations/ (ADR 0006) are excluded from this
+# default scope and checked individually in CI instead, each with its
+# own third-party stubs/dependency installed -- the same reason otel.py
+# below needs an override rather than being expected to type-check
+# without opentelemetry-api installed, just at 30x the scale, where a
+# blanket exclude is more honest than 30 near-identical per-module
+# overrides. This default scope covers what every contributor should run
+# locally before a core PR.
 #
 # python_version pinned to 3.12, independent of whichever interpreter
 # actually runs mypy: runtime/monitoring.py's sys.monitoring (PEP 669)

@@ -30,46 +30,49 @@ jobs:
         run: pytest tests -q
 
   plugin-contract-tests:
-    # Each plugin has its own third-party dependency (pandas, sqlalchemy,
-    # fastapi, ...); installing all of them into the core matrix above
-    # would make every core-only change pay for every plugin's install
-    # time. Kept separate so a plugin dependency bump can't block a
-    # core-only PR, and vice versa.
+    # ADR 0006: all 30 integrations live inside the single whytrail
+    # package as optional extras now, not as 30 separate distributions --
+    # so this job installs `whytrail[extra]` from the one package instead
+    # of `pip install -e ./plugins/whytrail-X`. Still a separate job from
+    # `test` above: each extra pulls in its own third-party dependency
+    # (pandas, sqlalchemy, fastapi, ...), and installing all 30 into the
+    # core matrix would make every core-only change pay for every
+    # integration's install time.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        plugin:
-          - whytrail-requests
-          - whytrail-pytest
-          - whytrail-sentry
-          - whytrail-pandas
-          - whytrail-sqlalchemy
-          - whytrail-fastapi
-          - whytrail-django
-          - whytrail-celery
-          - whytrail-langchain
-          - whytrail-pydantic
-          - whytrail-boto3
-          - whytrail-httpx
-          - whytrail-openai
-          - whytrail-anthropic
-          - whytrail-asyncpg
-          - whytrail-pymongo
-          - whytrail-marshmallow
-          - whytrail-jsonschema
-          - whytrail-polars
-          - whytrail-rq
-          - whytrail-dramatiq
-          - whytrail-flask
-          - whytrail-pyyaml
-          - whytrail-grpcio
-          - whytrail-scrapy
-          - whytrail-aiohttp
-          - whytrail-huggingface-hub
-          - whytrail-google-cloud
-          - whytrail-ddtrace
-          - whytrail-prefect
+        extra:
+          - requests
+          - pytest
+          - sentry
+          - pandas
+          - sqlalchemy
+          - fastapi
+          - django
+          - celery
+          - langchain
+          - pydantic
+          - boto3
+          - httpx
+          - openai
+          - anthropic
+          - asyncpg
+          - pymongo
+          - marshmallow
+          - jsonschema
+          - polars
+          - rq
+          - dramatiq
+          - flask
+          - pyyaml
+          - grpcio
+          - scrapy
+          - aiohttp
+          - huggingface-hub
+          - google-cloud
+          - ddtrace
+          - prefect
     steps:
       - uses: actions/checkout@v4
 
@@ -77,39 +80,37 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install whytrail + plugin under test + test deps
+      - name: Install whytrail[extra] + test-only tools
         run: |
-          pip install -e ".[dev]"
-          # [test] is requested for every plugin uniformly; pip just warns
-          # ("does not provide the extra") and continues for the ~28 that
-          # don't declare one. The two that do (whytrail-fastapi needs the
-          # real fastapi package + httpx's TestClient; whytrail-rq needs
-          # fakeredis) are test-only tools neither plugin depends on at
-          # runtime, so they don't belong in the plugin's own
-          # `dependencies` -- found when both failed on the first real CI
-          # run with pytest exit 5 ("no tests collected"), since their
-          # test files' module-level `pytest.importorskip` guards turned a
-          # missing test-only dependency into a silent zero-test skip
-          # rather than a visible failure.
-          pip install -e "./plugins/${{ matrix.plugin }}[test]"
+          pip install -e ".[dev,${{ matrix.extra }}]"
+          # fastapi's extra is `starlette` (the plugin's real runtime
+          # dependency -- see the fastapi note in plugin-version-matrix
+          # below), so the actual `fastapi` package + httpx's TestClient
+          # are test-only tools, not part of the extra. Same for rq's
+          # fakeredis: a real Redis connection is rq's own runtime
+          # dependency, correctly not part of the `rq` extra, but the
+          # test simulates one instead of requiring a live server in CI.
+          # Both found the same way: a missing test-only dependency
+          # turned into a silent "no tests collected" (pytest exit 5)
+          # rather than a visible failure, on the first real CI run.
+          case "${{ matrix.extra }}" in
+            fastapi) pip install fastapi httpx ;;
+            rq) pip install fakeredis ;;
+          esac
 
-      - name: Run this plugin's contract tests
+      - name: Run this integration's contract tests
         run: |
-          # Strip the "whytrail-" prefix, then convert any remaining
-          # dashes to underscores -- needed for plugins like
-          # whytrail-google-cloud and whytrail-huggingface-hub, whose test
-          # files (test_google_cloud_plugin.py,
-          # test_huggingface_hub_plugin.py) use underscores throughout.
-          # A prefix-only strip would look for a literal dash in the
-          # filename and silently match zero tests.
-          name="${{ matrix.plugin }}"
-          test_name="${name#whytrail-}"
-          test_name="${test_name//-/_}"
+          # Convert dashes to underscores -- needed for extras like
+          # google-cloud and huggingface-hub, whose test files
+          # (test_google_cloud_plugin.py, test_huggingface_hub_plugin.py)
+          # use underscores throughout.
+          name="${{ matrix.extra }}"
+          test_name="${name//-/_}"
           pytest "tests/plugin_contract/test_${test_name}_plugin.py" -q
 
   plugin-version-matrix:
-    # docs/testing-maturity.md gap #1: every plugin above installs
-    # whatever `pip` resolves today, never the specific floor each
+    # docs/testing-maturity.md gap #1: every extra above installs
+    # whatever `pip` resolves today, never the specific floor
     # pyproject.toml claims to support. Checking that floor for real
     # found real version-compatibility bugs in two rounds: first locally
     # in this sandbox (Windows, before this job existed), then again --
@@ -117,8 +118,8 @@ jobs:
     # targets, the first time it ever executed for real. Neither round
     # alone would have found everything the other did; several "confirmed
     # fine" conclusions from local-only testing turned out wrong once a
-    # real CI run actually exercised each plugin's contract tests against
-    # its pinned floor, not just "does it install and import."
+    # real CI run actually exercised each integration's contract tests
+    # against its pinned floor, not just "does it install and import."
     #
     # No 3.13 wheel / build failure (found locally, still holds on Linux):
     #   - pydantic==2.0.3: pydantic-core fails to build from source
@@ -159,34 +160,36 @@ jobs:
     #   - prefect (see above): also hit a `pydantic.ConfigWrapper`
     #     TypeError against pydantic's newest 2.x releases, and separately
     #     a `griffe.Docstring` import removed by a later griffe release --
-    #     three independent drift issues layered on the same plugin.
+    #     three independent drift issues layered on the same integration.
     #
-    # Plugin/test written against a newer version of the SDK's own API
-    # than the stated floor actually provides -- not a Python-version or
-    # transitive-drift issue, just an old client library:
+    # Integration/test written against a newer version of the SDK's own
+    # API than the stated floor actually provides -- not a Python-version
+    # or transitive-drift issue, just an old client library:
     #   - ddtrace==2.0.0: `ddtrace.trace.tracer` (a module-level singleton
     #     the test imports) didn't exist yet. First working: 2.20.0.
     #   - openai==1.0.0: exception `.body` shape at this version doesn't
-    #     match what the plugin reads. First working, by bisection: 1.30.0.
+    #     match what the integration reads. First working, by bisection:
+    #     1.30.0.
     #   - anthropic==0.30.0: same shape issue. First working: 0.34.0.
     #   - huggingface_hub==0.20.0: `huggingface_hub.errors` (the module the
-    #     plugin imports) didn't exist yet, and even once it did (0.22+),
-    #     `hf_raise_for_status()`'s response-shape handling didn't match
-    #     until the 1.x line. First working: 1.0.0 -- a major-version
-    #     jump, not a patch bump, the same way prefect needed one.
+    #     integration imports) didn't exist yet, and even once it did
+    #     (0.22+), `hf_raise_for_status()`'s response-shape handling
+    #     didn't match until the 1.x line. First working: 1.0.0 -- a
+    #     major-version jump, not a patch bump, the same way prefect
+    #     needed one.
     #
     # Not independently version-testable the way this job assumes:
-    #   - whytrail-fastapi tests build a real FastAPI app, so `starlette`
-    #     alone isn't a meaningful axis to pin -- forcing an old starlette
-    #     floor (0.36.0) against whatever fastapi the test-tools step
-    #     installs breaks on an unrelated TestClient API mismatch the
-    #     moment the two are versioned independently. `fastapi` is the
-    #     pinned dependency instead (floor 0.115.0, the oldest version
-    #     confirmed to both resolve a starlette satisfying the plugin's
-    #     real >=0.36 floor *and* pass); the test-tools step below installs
-    #     only httpx for this plugin now, not fastapi.
+    #   - the fastapi integration's test builds a real FastAPI app, so
+    #     `starlette` alone isn't a meaningful axis to pin -- forcing an
+    #     old starlette floor (0.36.0) against whatever fastapi the
+    #     test-tools step installs breaks on an unrelated TestClient API
+    #     mismatch the moment the two are versioned independently.
+    #     `fastapi` is the pinned dependency instead (floor 0.115.0, the
+    #     oldest version confirmed to both resolve a starlette satisfying
+    #     the integration's real >=0.36 floor *and* pass); the test-tools
+    #     step below installs only httpx for this one, not fastapi.
     #
-    # Every other plugin's stated floor (boto3, httpx, django, celery,
+    # Every other extra's stated floor (boto3, httpx, django, celery,
     # dramatiq, rq, langchain-core, google-api-core, pytest, jsonschema,
     # scrapy, polars, aiohttp, pymongo) was checked the same way on real
     # ubuntu-latest CI and confirmed to already work -- not assumed, just
@@ -194,88 +197,97 @@ jobs:
     # broken so far" and "confirmed working" are different-strength claims,
     # and CHANGELOG.md for the full account of both rounds of findings.
     #
-    # This job pins each plugin's *actual* Python-3.13-compatible floor
-    # (not the aspirational one in pyproject.toml, which is still correct
-    # for older Python versions) against the latest release, so a future
-    # dependency bump that reintroduces a gap like this fails CI instead
-    # of being discovered by a user.
-    # Each entry below is fully explicit (plugin, dependency, floor,
-    # dependency-version) rather than a `plugin`x`dependency-version`
+    # This job pins each integration's *actual* Python-3.13-compatible
+    # floor (not the aspirational one in pyproject.toml, which is still
+    # correct for older Python versions) against the latest release, so a
+    # future dependency bump that reintroduces a gap like this fails CI
+    # instead of being discovered by a user.
+    #
+    # Each entry below is fully explicit (extra, dependency, floor,
+    # dependency-version) rather than an `extra`x`dependency-version`
     # cross-product via a separate `include:` list. The cross-product
     # form was tried first and is wrong: `include` entries only merge
     # into a base matrix when they share a key with it, and these entries
     # share no key with a bare `dependency-version: [floor, latest]` axis
-    # -- so instead of the intended 60 jobs (30 plugins x 2 versions),
-    # only 2 generic jobs ran, both missing plugin context entirely. Not
-    # caught by local `mkdocs`/`mypy`/`pytest` verification, since none
-    # of those parse this workflow file -- only found by watching the
-    # first real push actually run it and seeing "plugin-version-matrix
-    # (floor)" and "(latest)" instead of 60 named jobs.
+    # -- so instead of the intended 60 jobs (30 extras x 2 versions), only
+    # 2 generic jobs ran, both missing extra context entirely. Not caught
+    # by local `mkdocs`/`mypy`/`pytest` verification, since none of those
+    # parse this workflow file -- only found by watching the first real
+    # push actually run it and seeing "plugin-version-matrix (floor)" and
+    # "(latest)" instead of 60 named jobs.
+    #
+    # ADR 0006 note: since every integration's code now lives inside the
+    # whytrail package itself rather than a separate distribution, there's
+    # no more "install the plugin package without its dependency pin"
+    # step -- `pip install -e ".[dev]"` alone already puts the integration
+    # module on disk; it just won't successfully register until the
+    # dependency below is installed too (src/whytrail/registry.py's
+    # _load_builtin_explainers() catches the ImportError until then).
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { plugin: whytrail-pydantic, dependency: pydantic, floor: "2.8.0", dependency-version: floor }
-          - { plugin: whytrail-pydantic, dependency: pydantic, floor: "2.8.0", dependency-version: latest }
-          - { plugin: whytrail-sqlalchemy, dependency: sqlalchemy, floor: "2.0.36", dependency-version: floor }
-          - { plugin: whytrail-sqlalchemy, dependency: sqlalchemy, floor: "2.0.36", dependency-version: latest }
-          - { plugin: whytrail-asyncpg, dependency: asyncpg, floor: "0.30.0", dependency-version: floor }
-          - { plugin: whytrail-asyncpg, dependency: asyncpg, floor: "0.30.0", dependency-version: latest }
-          - { plugin: whytrail-pyyaml, dependency: pyyaml, floor: "6.0.2", dependency-version: floor }
-          - { plugin: whytrail-pyyaml, dependency: pyyaml, floor: "6.0.2", dependency-version: latest }
-          - { plugin: whytrail-grpcio, dependency: grpcio, floor: "1.66.2", dependency-version: floor }
-          - { plugin: whytrail-grpcio, dependency: grpcio, floor: "1.66.2", dependency-version: latest }
-          - { plugin: whytrail-ddtrace, dependency: ddtrace, floor: "2.20.0", dependency-version: floor }
-          - { plugin: whytrail-ddtrace, dependency: ddtrace, floor: "2.20.0", dependency-version: latest }
-          - { plugin: whytrail-pandas, dependency: pandas, floor: "2.2.3", dependency-version: floor }
-          - { plugin: whytrail-pandas, dependency: pandas, floor: "2.2.3", dependency-version: latest }
-          - { plugin: whytrail-marshmallow, dependency: marshmallow, floor: "3.15.0", dependency-version: floor }
-          - { plugin: whytrail-marshmallow, dependency: marshmallow, floor: "3.15.0", dependency-version: latest }
-          - { plugin: whytrail-requests, dependency: requests, floor: "2.25.0", dependency-version: floor }
-          - { plugin: whytrail-requests, dependency: requests, floor: "2.25.0", dependency-version: latest }
-          - { plugin: whytrail-prefect, dependency: prefect, floor: "3.7.8", dependency-version: floor }
-          - { plugin: whytrail-prefect, dependency: prefect, floor: "3.7.8", dependency-version: latest }
-          - { plugin: whytrail-polars, dependency: polars, floor: "0.20.0", dependency-version: floor }
-          - { plugin: whytrail-polars, dependency: polars, floor: "0.20.0", dependency-version: latest }
-          - { plugin: whytrail-aiohttp, dependency: aiohttp, floor: "3.9.0", dependency-version: floor }
-          - { plugin: whytrail-aiohttp, dependency: aiohttp, floor: "3.9.0", dependency-version: latest }
-          - { plugin: whytrail-boto3, dependency: boto3, floor: "1.34.0", dependency-version: floor }
-          - { plugin: whytrail-boto3, dependency: boto3, floor: "1.34.0", dependency-version: latest }
-          - { plugin: whytrail-httpx, dependency: httpx, floor: "0.27.0", dependency-version: floor }
-          - { plugin: whytrail-httpx, dependency: httpx, floor: "0.27.0", dependency-version: latest }
-          - { plugin: whytrail-flask, dependency: flask, floor: "2.3.3", dependency-version: floor }
-          - { plugin: whytrail-flask, dependency: flask, floor: "2.3.3", dependency-version: latest }
-          - { plugin: whytrail-django, dependency: django, floor: "4.2.0", dependency-version: floor }
-          - { plugin: whytrail-django, dependency: django, floor: "4.2.0", dependency-version: latest }
-          - { plugin: whytrail-celery, dependency: celery, floor: "5.3.0", dependency-version: floor }
-          - { plugin: whytrail-celery, dependency: celery, floor: "5.3.0", dependency-version: latest }
-          - { plugin: whytrail-dramatiq, dependency: dramatiq, floor: "1.14.0", dependency-version: floor }
-          - { plugin: whytrail-dramatiq, dependency: dramatiq, floor: "1.14.0", dependency-version: latest }
-          - { plugin: whytrail-rq, dependency: rq, floor: "1.15.0", dependency-version: floor }
-          - { plugin: whytrail-rq, dependency: rq, floor: "1.15.0", dependency-version: latest }
-          - { plugin: whytrail-sentry, dependency: sentry-sdk, floor: "2.11.0", dependency-version: floor }
-          - { plugin: whytrail-sentry, dependency: sentry-sdk, floor: "2.11.0", dependency-version: latest }
-          - { plugin: whytrail-langchain, dependency: langchain-core, floor: "0.2.0", dependency-version: floor }
-          - { plugin: whytrail-langchain, dependency: langchain-core, floor: "0.2.0", dependency-version: latest }
-          - { plugin: whytrail-huggingface-hub, dependency: huggingface_hub, floor: "1.0.0", dependency-version: floor }
-          - { plugin: whytrail-huggingface-hub, dependency: huggingface_hub, floor: "1.0.0", dependency-version: latest }
-          - { plugin: whytrail-google-cloud, dependency: google-api-core, floor: "2.15.0", dependency-version: floor }
-          - { plugin: whytrail-google-cloud, dependency: google-api-core, floor: "2.15.0", dependency-version: latest }
-          - { plugin: whytrail-anthropic, dependency: anthropic, floor: "0.34.0", dependency-version: floor }
-          - { plugin: whytrail-anthropic, dependency: anthropic, floor: "0.34.0", dependency-version: latest }
-          - { plugin: whytrail-openai, dependency: openai, floor: "1.30.0", dependency-version: floor }
-          - { plugin: whytrail-openai, dependency: openai, floor: "1.30.0", dependency-version: latest }
-          - { plugin: whytrail-pytest, dependency: pytest, floor: "7.0.0", dependency-version: floor }
-          - { plugin: whytrail-pytest, dependency: pytest, floor: "7.0.0", dependency-version: latest }
-          - { plugin: whytrail-jsonschema, dependency: jsonschema, floor: "4.0.0", dependency-version: floor }
-          - { plugin: whytrail-jsonschema, dependency: jsonschema, floor: "4.0.0", dependency-version: latest }
-          - { plugin: whytrail-scrapy, dependency: scrapy, floor: "2.8.0", dependency-version: floor }
-          - { plugin: whytrail-scrapy, dependency: scrapy, floor: "2.8.0", dependency-version: latest }
-          - { plugin: whytrail-fastapi, dependency: fastapi, floor: "0.115.0", dependency-version: floor }
-          - { plugin: whytrail-fastapi, dependency: fastapi, floor: "0.115.0", dependency-version: latest }
-          - { plugin: whytrail-pymongo, dependency: pymongo, floor: "4.0.0", dependency-version: floor }
-          - { plugin: whytrail-pymongo, dependency: pymongo, floor: "4.0.0", dependency-version: latest }
+          - { extra: pydantic, dependency: pydantic, floor: "2.8.0", dependency-version: floor }
+          - { extra: pydantic, dependency: pydantic, floor: "2.8.0", dependency-version: latest }
+          - { extra: sqlalchemy, dependency: sqlalchemy, floor: "2.0.36", dependency-version: floor }
+          - { extra: sqlalchemy, dependency: sqlalchemy, floor: "2.0.36", dependency-version: latest }
+          - { extra: asyncpg, dependency: asyncpg, floor: "0.30.0", dependency-version: floor }
+          - { extra: asyncpg, dependency: asyncpg, floor: "0.30.0", dependency-version: latest }
+          - { extra: pyyaml, dependency: pyyaml, floor: "6.0.2", dependency-version: floor }
+          - { extra: pyyaml, dependency: pyyaml, floor: "6.0.2", dependency-version: latest }
+          - { extra: grpcio, dependency: grpcio, floor: "1.66.2", dependency-version: floor }
+          - { extra: grpcio, dependency: grpcio, floor: "1.66.2", dependency-version: latest }
+          - { extra: ddtrace, dependency: ddtrace, floor: "2.20.0", dependency-version: floor }
+          - { extra: ddtrace, dependency: ddtrace, floor: "2.20.0", dependency-version: latest }
+          - { extra: pandas, dependency: pandas, floor: "2.2.3", dependency-version: floor }
+          - { extra: pandas, dependency: pandas, floor: "2.2.3", dependency-version: latest }
+          - { extra: marshmallow, dependency: marshmallow, floor: "3.15.0", dependency-version: floor }
+          - { extra: marshmallow, dependency: marshmallow, floor: "3.15.0", dependency-version: latest }
+          - { extra: requests, dependency: requests, floor: "2.25.0", dependency-version: floor }
+          - { extra: requests, dependency: requests, floor: "2.25.0", dependency-version: latest }
+          - { extra: prefect, dependency: prefect, floor: "3.7.8", dependency-version: floor }
+          - { extra: prefect, dependency: prefect, floor: "3.7.8", dependency-version: latest }
+          - { extra: polars, dependency: polars, floor: "0.20.0", dependency-version: floor }
+          - { extra: polars, dependency: polars, floor: "0.20.0", dependency-version: latest }
+          - { extra: aiohttp, dependency: aiohttp, floor: "3.9.0", dependency-version: floor }
+          - { extra: aiohttp, dependency: aiohttp, floor: "3.9.0", dependency-version: latest }
+          - { extra: boto3, dependency: boto3, floor: "1.34.0", dependency-version: floor }
+          - { extra: boto3, dependency: boto3, floor: "1.34.0", dependency-version: latest }
+          - { extra: httpx, dependency: httpx, floor: "0.27.0", dependency-version: floor }
+          - { extra: httpx, dependency: httpx, floor: "0.27.0", dependency-version: latest }
+          - { extra: flask, dependency: flask, floor: "2.3.3", dependency-version: floor }
+          - { extra: flask, dependency: flask, floor: "2.3.3", dependency-version: latest }
+          - { extra: django, dependency: django, floor: "4.2.0", dependency-version: floor }
+          - { extra: django, dependency: django, floor: "4.2.0", dependency-version: latest }
+          - { extra: celery, dependency: celery, floor: "5.3.0", dependency-version: floor }
+          - { extra: celery, dependency: celery, floor: "5.3.0", dependency-version: latest }
+          - { extra: dramatiq, dependency: dramatiq, floor: "1.14.0", dependency-version: floor }
+          - { extra: dramatiq, dependency: dramatiq, floor: "1.14.0", dependency-version: latest }
+          - { extra: rq, dependency: rq, floor: "1.15.0", dependency-version: floor }
+          - { extra: rq, dependency: rq, floor: "1.15.0", dependency-version: latest }
+          - { extra: sentry, dependency: sentry-sdk, floor: "2.11.0", dependency-version: floor }
+          - { extra: sentry, dependency: sentry-sdk, floor: "2.11.0", dependency-version: latest }
+          - { extra: langchain, dependency: langchain-core, floor: "0.2.0", dependency-version: floor }
+          - { extra: langchain, dependency: langchain-core, floor: "0.2.0", dependency-version: latest }
+          - { extra: huggingface-hub, dependency: huggingface_hub, floor: "1.0.0", dependency-version: floor }
+          - { extra: huggingface-hub, dependency: huggingface_hub, floor: "1.0.0", dependency-version: latest }
+          - { extra: google-cloud, dependency: google-api-core, floor: "2.15.0", dependency-version: floor }
+          - { extra: google-cloud, dependency: google-api-core, floor: "2.15.0", dependency-version: latest }
+          - { extra: anthropic, dependency: anthropic, floor: "0.34.0", dependency-version: floor }
+          - { extra: anthropic, dependency: anthropic, floor: "0.34.0", dependency-version: latest }
+          - { extra: openai, dependency: openai, floor: "1.30.0", dependency-version: floor }
+          - { extra: openai, dependency: openai, floor: "1.30.0", dependency-version: latest }
+          - { extra: pytest, dependency: pytest, floor: "7.0.0", dependency-version: floor }
+          - { extra: pytest, dependency: pytest, floor: "7.0.0", dependency-version: latest }
+          - { extra: jsonschema, dependency: jsonschema, floor: "4.0.0", dependency-version: floor }
+          - { extra: jsonschema, dependency: jsonschema, floor: "4.0.0", dependency-version: latest }
+          - { extra: scrapy, dependency: scrapy, floor: "2.8.0", dependency-version: floor }
+          - { extra: scrapy, dependency: scrapy, floor: "2.8.0", dependency-version: latest }
+          - { extra: fastapi, dependency: fastapi, floor: "0.115.0", dependency-version: floor }
+          - { extra: fastapi, dependency: fastapi, floor: "0.115.0", dependency-version: latest }
+          - { extra: pymongo, dependency: pymongo, floor: "4.0.0", dependency-version: floor }
+          - { extra: pymongo, dependency: pymongo, floor: "4.0.0", dependency-version: latest }
     steps:
       - uses: actions/checkout@v4
 
@@ -283,26 +295,14 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install whytrail + plugin (without its dependency pin)
-        run: |
-          pip install -e ".[dev]"
-          pip install -e "./plugins/${{ matrix.plugin }}" --no-deps
+      - name: Install whytrail (core only -- the dependency under test is pinned separately below)
+        run: pip install -e ".[dev]"
 
-      - name: Install this plugin's test-only tools, if any
-        # --no-deps above (deliberately, so the next step controls the
-        # dependency-under-test's exact version) also blocks pip from
-        # resolving [test]-extra packages via the normal
-        # "pkg[test]" syntax, since --no-deps skips all dependency
-        # metadata, not just the core `dependencies` list -- so these
-        # are installed directly by name instead, same tools as
-        # plugin-contract-tests' [test] extra above.
-        # whytrail-fastapi installs only httpx here, not fastapi itself --
-        # fastapi is the dependency under test for this plugin (see the
-        # entries above and the note by them), handled by the next step.
+      - name: Install this integration's test-only tools, if any
         run: |
-          case "${{ matrix.plugin }}" in
-            whytrail-fastapi) pip install httpx ;;
-            whytrail-rq) pip install fakeredis ;;
+          case "${{ matrix.extra }}" in
+            fastapi) pip install httpx ;;
+            rq) pip install fakeredis ;;
           esac
 
       - name: Install the dependency at the version under test
@@ -313,11 +313,10 @@ jobs:
             pip install --upgrade "${{ matrix.dependency }}"
           fi
 
-      - name: Run this plugin's contract tests
+      - name: Run this integration's contract tests
         run: |
-          name="${{ matrix.plugin }}"
-          test_name="${name#whytrail-}"
-          test_name="${test_name//-/_}"
+          name="${{ matrix.extra }}"
+          test_name="${name//-/_}"
           pytest "tests/plugin_contract/test_${test_name}_plugin.py" -q
 
   benchmarks:

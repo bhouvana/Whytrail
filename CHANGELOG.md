@@ -3,6 +3,51 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] - unified all 30 plugins into extras of one package (ADR 0006)
+
+A fresh-install smoke test of the real PyPI package (not the local
+build) confirmed core `whytrail` works end to end -- but also surfaced
+that none of the 30 plugin distributions were ever published, only
+core. The README's ecosystem table implied `pip install
+whytrail-requests` worked; it didn't. Publishing all 30 separately would
+have meant registering 30 PyPI pending-publishers by hand and 30 ongoing
+release processes going forward -- reconsidered instead: all 30 are now
+optional extras of the single `whytrail` package (`pip install
+whytrail[requests]`, `whytrail[all]`), one release process, the
+zero-required-dependencies promise for bare `pip install whytrail`
+unchanged. Full reasoning in
+`docs/adr/0006-unify-plugins-into-extras.md`.
+
+- `plugins/whytrail-*/src/whytrail_*/__init__.py` moved to
+  `src/whytrail/integrations/*.py` (30 files, `git mv`, history
+  preserved). The 18 explainer-shaped ones auto-register lazily via a
+  new static list (`registry._BUILTIN_EXPLAINERS`); the 12
+  integration-shaped ones (hooks/middleware/signals) are imported and
+  wired in explicitly, same as before.
+- The `whytrail.explainers` entry-point mechanism and
+  `register_from_plugin()` are unchanged and un-removed -- still the
+  right answer for a third party who wants to publish their own
+  integration outside this repo. `scripts/new_plugin.py` now scaffolds
+  that external case specifically.
+- `pyproject.toml` gained 30 extras plus a self-referencing `all` meta-extra,
+  and a `[project.entry-points.pytest11]` declaration (pytest's own
+  plugin discovery is independent of whytrail's registry and always was).
+- `[tool.mypy]` gained `exclude = ["^src/whytrail/integrations/"]` --
+  the same reason `otel.py` needed an override (third-party stubs not
+  installed in the default `dev` environment), now at 30x the scale,
+  where a blanket exclude is more honest than 30 near-identical
+  per-module overrides. Integrations are still checked individually in
+  CI.
+- CI simplified along with the restructure: `plugin-version-matrix` no
+  longer needs an "install the plugin package without its dependency
+  pin" step, since the integration module is already on disk as soon as
+  core `whytrail` installs -- it just doesn't register until the
+  dependency is present. Verified on real Linux (WSL2 + `uv`-managed
+  Python, since Docker Desktop wasn't running in this sandbox) before
+  pushing.
+- All 237 tests pass unchanged against the new layout; `mypy --strict`
+  clean.
+
 ## [Unreleased] - second CI run found eight more, real Linux this time
 
 The three-bug fix above unblocked the `test` and `plugin-contract-tests`

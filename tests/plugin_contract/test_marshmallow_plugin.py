@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 marshmallow = pytest.importorskip("marshmallow")
-pytest.importorskip("whytrail_marshmallow")
+pytest.importorskip("whytrail.integrations.marshmallow")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

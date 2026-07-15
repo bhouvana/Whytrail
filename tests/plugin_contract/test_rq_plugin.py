@@ -29,9 +29,9 @@ import pytest
 
 fakeredis = pytest.importorskip("fakeredis")
 rq = pytest.importorskip("rq")
-pytest.importorskip("whytrail_rq")
+pytest.importorskip("whytrail.integrations.rq")
 
-import whytrail_rq  # noqa: E402
+import whytrail.integrations.rq as whytrail_rq  # noqa: E402
 
 SECRET = "sk-super-secret-token"
 

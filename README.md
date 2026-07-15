@@ -40,10 +40,18 @@ for the full reasoning behind that design choice, and why a fully automatic
 ## Install
 
 ```bash
-pip install whytrail          # core, zero dependencies
-pip install whytrail[rich]    # + Explanation.rich() tree rendering
-pip install whytrail[cli]     # + the `whytrail` CLI
+pip install whytrail            # core, zero dependencies
+pip install whytrail[rich]      # + Explanation.rich() tree rendering
+pip install whytrail[cli]       # + the `whytrail` CLI
+pip install whytrail[requests]  # + auto-explain requests.RequestException, etc.
+pip install whytrail[all]       # every integration below, one install
 ```
+
+One package, one version -- all 30 integrations below are extras of
+`whytrail` itself, not separate PyPI packages (ADR 0006). `pip install
+whytrail[X]` pulls in exactly the library `X` explains, nothing else;
+`why()` picks it up automatically the moment it's installed, no further
+setup.
 
 ## Why not just use a debugger / logging / OpenTelemetry?
 
@@ -61,40 +69,44 @@ Each answers a different question:
 
 Five verbs (`why`, `track`, `tracked`, `trace`, `register`) plus two
 persistence helpers (`snapshot`, `restore`). Domain-specific integrations
-are separate plugin packages, not new verbs -- see `docs/plugin-guide.md`.
+are extras of this same package, not new verbs -- see
+`docs/plugin-guide.md`.
 
 ## Ecosystem
 
-30 plugins today, each earning its place by clearing one of three bars
-(structured error data, a security-sensitive boundary, or a non-standard
-capture mechanism) rather than existing just to exist -- see
-`docs/adr/0003-ecosystem-scale-triage.md` for the full reasoning, the
-next candidates, and the much longer list of libraries deliberately
+30 integrations today, each earning its place by clearing one of three
+bars (structured error data, a security-sensitive boundary, or a
+non-standard capture mechanism) rather than existing just to exist --
+see `docs/adr/0003-ecosystem-scale-triage.md` for the full reasoning,
+the next candidates, and the much longer list of libraries deliberately
 *not* wrapped, because generic `track()`/`@tracked` already covers them
 with zero extra code. Full table with what each one adds:
 `docs/plugin-guide.md`.
 
 | | | |
 |---|---|---|
-| `whytrail-requests` | `whytrail-httpx` | `whytrail-aiohttp` |
-| `whytrail-huggingface-hub` | `whytrail-openai` | `whytrail-anthropic` |
-| `whytrail-boto3` | `whytrail-google-cloud` | `whytrail-sqlalchemy` |
-| `whytrail-asyncpg` | `whytrail-pymongo` | `whytrail-grpcio` |
-| `whytrail-pydantic` | `whytrail-marshmallow` | `whytrail-jsonschema` |
-| `whytrail-pyyaml` | `whytrail-pandas` | `whytrail-polars` |
-| `whytrail-sentry` | `whytrail-ddtrace` | `whytrail-celery` |
-| `whytrail-rq` | `whytrail-dramatiq` | `whytrail-prefect` |
-| `whytrail-scrapy` | `whytrail-pytest` | `whytrail-fastapi` |
-| `whytrail-django` | `whytrail-flask` | `whytrail-langchain` |
+| `whytrail[requests]` | `whytrail[httpx]` | `whytrail[aiohttp]` |
+| `whytrail[huggingface-hub]` | `whytrail[openai]` | `whytrail[anthropic]` |
+| `whytrail[boto3]` | `whytrail[google-cloud]` | `whytrail[sqlalchemy]` |
+| `whytrail[asyncpg]` | `whytrail[pymongo]` | `whytrail[grpcio]` |
+| `whytrail[pydantic]` | `whytrail[marshmallow]` | `whytrail[jsonschema]` |
+| `whytrail[pyyaml]` | `whytrail[pandas]` | `whytrail[polars]` |
+| `whytrail[sentry]` | `whytrail[ddtrace]` | `whytrail[celery]` |
+| `whytrail[rq]` | `whytrail[dramatiq]` | `whytrail[prefect]` |
+| `whytrail[scrapy]` | `whytrail[pytest]` | `whytrail[fastapi]` |
+| `whytrail[django]` | `whytrail[flask]` | `whytrail[langchain]` |
 
+All 30 in one install: `pip install whytrail[all]`. Want to publish your
+own, outside this repo, for a library not on this list?
 `python scripts/new_plugin.py <library> --kind explainer|integration`
-scaffolds a new one. `.github/actions/whytrail-run` packages the CLI as a
-GitHub Action for CI.
+scaffolds that (ADR 0006 -- the entry-point extensibility mechanism the
+bundled 30 used to use is still there for exactly this). `.github/actions
+/whytrail-run` packages the CLI as a GitHub Action for CI.
 
-**On test coverage:** every plugin above is verified against a real
-object from the real library, not a mock, and every plugin's stated
-minimum dependency version is confirmed to actually install and work on
-the newest supported Python -- both caught real bugs, twenty of them
+**On test coverage:** every integration above is verified against a real
+object from the real library, not a mock, and every one's stated minimum
+dependency version is confirmed to actually install and work on the
+newest supported Python -- both caught real bugs, twenty of them
 version-compatibility gaps invisible from the version number alone,
 eight of those found only once this project's CI actually ran on real
 Linux for the first time rather than the Windows sandbox it was built in
@@ -120,6 +132,9 @@ architecture this was built from:
   called `whytrail` and not `butwhy`.
 - [`0005`](docs/adr/0005-vscode-extension-scope.md) -- VS Code extension
   scope assessment (not started, and why).
+- [`0006`](docs/adr/0006-unify-plugins-into-extras.md) -- why the 30
+  integrations became extras of one package instead of 30 separate
+  PyPI distributions.
 
 Full documentation site (same content, easier to browse):
 https://bhouvana.github.io/Whytrail/

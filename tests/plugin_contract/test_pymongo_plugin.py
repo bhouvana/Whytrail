@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 pymongo = pytest.importorskip("pymongo")
-pytest.importorskip("whytrail_pymongo")
+pytest.importorskip("whytrail.integrations.pymongo")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

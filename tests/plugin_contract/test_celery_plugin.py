@@ -9,9 +9,9 @@ import logging
 import pytest
 
 celery = pytest.importorskip("celery")
-pytest.importorskip("whytrail_celery")
+pytest.importorskip("whytrail.integrations.celery")
 
-import whytrail_celery  # noqa: E402
+import whytrail.integrations.celery as whytrail_celery  # noqa: E402
 from celery import Celery  # noqa: E402
 from celery.signals import task_failure  # noqa: E402
 

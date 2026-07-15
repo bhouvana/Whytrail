@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 pydantic = pytest.importorskip("pydantic")
-pytest.importorskip("whytrail_pydantic")
+pytest.importorskip("whytrail.integrations.pydantic")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

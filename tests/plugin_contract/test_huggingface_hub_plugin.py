@@ -9,7 +9,7 @@ import pytest
 
 httpx = pytest.importorskip("httpx")
 huggingface_hub = pytest.importorskip("huggingface_hub")
-pytest.importorskip("whytrail_huggingface_hub")
+pytest.importorskip("whytrail.integrations.huggingface_hub")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

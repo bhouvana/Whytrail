@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 google_exceptions = pytest.importorskip("google.api_core.exceptions")
-pytest.importorskip("whytrail_google_cloud")
+pytest.importorskip("whytrail.integrations.google_cloud")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 sentry_sdk = pytest.importorskip("sentry_sdk")
-whytrail_sentry = pytest.importorskip("whytrail_sentry")
+whytrail_sentry = pytest.importorskip("whytrail.integrations.sentry")
 
 from sentry_sdk.transport import Transport  # noqa: E402
 

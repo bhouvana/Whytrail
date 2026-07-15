@@ -1,17 +1,35 @@
 # Writing a whytrail plugin
 
 A plugin teaches `why()` to explain a type it doesn't know about, or wires
-whytrail into a library's own hook system where one exists. See
-[`plugins/whytrail-requests`](../plugins/whytrail-requests/) for a complete,
-tested reference implementation of the first shape, and
-[`plugins/whytrail-celery`](../plugins/whytrail-celery/) for the second.
+whytrail into a library's own hook system where one exists. There are two
+ways to build one, and they matter for a different reason each (ADR 0006):
+
+- **Bundled** -- add a module to `src/whytrail/integrations/` in this
+  repo, and an extra in `pyproject.toml`. This is how all 30 integrations
+  below ship: one PyPI package (`whytrail`), `pip install whytrail[X]`
+  pulls in the extra dependency, and (for explainer-shaped ones)
+  `why()` picks it up automatically with zero further setup. Requires a
+  PR against this repo.
+- **External** -- your own, separately published `whytrail-mylib`
+  package, discovered via the `whytrail.explainers` entry point,
+  reviewed by nobody but you. This is how the bundled 30 used to work,
+  before ADR 0006 folded them into the core package for a simpler
+  release process -- the mechanism itself wasn't removed, and it's still
+  the right answer for an integration you want to own and release on
+  your own schedule.
+
+See [`src/whytrail/integrations/requests.py`](../src/whytrail/integrations/requests.py)
+for a complete, tested reference implementation of the explainer shape,
+and [`src/whytrail/integrations/celery.py`](../src/whytrail/integrations/celery.py)
+for the hook-based shape. Both read the same either way; only where the
+code lives and how it's registered differs.
 
 **Before writing one:** read
 [`docs/adr/0003-ecosystem-scale-triage.md`](adr/0003-ecosystem-scale-triage.md)
 first. Most libraries don't need a plugin at all -- `track()`/`@tracked`
 already works on arbitrary objects via `weakref` and `id()`-based
-identity, no library-specific code required (this is exactly what
-`whytrail-pandas` found: its plugin only earns its keep for the
+identity, no library-specific code required (this is exactly what the
+`pandas` integration found: it only earns its keep for the
 *untracked*-diagnostic case). A plugin is warranted when a library clears
 one of three bars: it carries structured error data a bare traceback
 throws away, it has a security-sensitive boundary needing safe defaults,
@@ -20,9 +38,12 @@ If you can't point to which bar your idea clears, it probably shouldn't
 be a plugin.
 
 `python scripts/new_plugin.py <library> --kind explainer|integration`
-scaffolds the boilerplate (pyproject.toml, package stub, README, starter
-test) for either shape -- it does not, and should not, generate the
-actual explainer logic; that judgment call is the point.
+scaffolds the boilerplate for an **external** plugin (pyproject.toml,
+package stub, README, starter test) -- it does not, and should not,
+generate the actual explainer logic; that judgment call is the point. For
+a **bundled** integration, there's no scaffold script: copy the shape of
+an existing module under `src/whytrail/integrations/` closest to what
+you're building.
 
 ## The shape of an explainer (registry-based plugins)
 
@@ -58,13 +79,35 @@ a validation input, a task payload, anything that isn't safely public --
 put it on `ExplanationStep.locals` (a `dict[str, str]`), not in
 `description`. That's the one thing `Explanation.redacted()` strips
 before an integration exports off-box (Sentry, OTel, a CI comment); text
-smashed into `description` can't be redacted after the fact. See
-`whytrail-sqlalchemy` (statement params) or `whytrail-pydantic` (bad field
+smashed into `description` can't be redacted after the fact. See the
+`sqlalchemy` integration (statement params) or `pydantic` (bad field
 values) for the pattern, and ADR 0002 §3 item 5 for why this matters.
 
 ## Registering
 
-### From a package (the common case)
+### Bundled (adding to this repo)
+
+Add `src/whytrail/integrations/mylib.py`:
+
+```python
+# src/whytrail/integrations/mylib.py
+from ..registry import register_from_plugin
+
+def register() -> None:
+    register_from_plugin(MyType, explain_my_type)
+```
+
+Add `mylib` to `registry._BUILTIN_EXPLAINERS` in
+[`src/whytrail/registry.py`](../src/whytrail/registry.py) -- that's the
+whole activation step. `resolve_explainer()` tries to import each name in
+that tuple lazily, once, the first time it needs to resolve an explainer
+it doesn't already have; a missing dependency just means `ImportError`,
+caught the same way a broken entry-point plugin's failure already is.
+Add a `mylib = ["mylib>=X.Y"]` extra to `pyproject.toml` so
+`pip install whytrail[mylib]` actually installs the library being
+explained.
+
+### External (your own separate package)
 
 Add an entry point in your plugin's `pyproject.toml`:
 
@@ -91,7 +134,8 @@ dependency your users have to think about beyond `pip install`.
 
 ### From a notebook or script
 
-No package, no entry point needed:
+No package, no entry point needed, whether you're extending a bundled or
+external integration:
 
 ```python
 import whytrail
@@ -100,8 +144,8 @@ whytrail.register(MyType, explain_my_type)
 
 A user's `whytrail.register()` call **always** wins over a plugin's
 `register_from_plugin()` for the same type, regardless of which runs first --
-if someone wants to override your plugin's explanation locally, they can,
-without forking your package.
+if someone wants to override a bundled or third-party explanation locally,
+they can, without forking anything.
 
 ## Protocol version
 
@@ -110,12 +154,12 @@ shape, `None`/exceptions meaning "fall through, not an error," the MRO
 walk in `resolve_explainer()`, and `register()` always beating
 `register_from_plugin()` for the same type -- is frozen as
 `whytrail.registry.EXPLAINER_PROTOCOL_VERSION = 1`, tracked independently
-of whytrail's own package version (ADR 0002 §3 item 6). This matters
-because whytrail's release number moves for reasons that have nothing to
-do with plugins (a new built-in explainer, a CLI flag, a bug fix in
-`Explanation.graph()`); coupling plugin compatibility to that number
-would force every plugin author to guess which whytrail releases are
-safe to depend on. They don't have to guess: protocol version 1 is a
+of whytrail's own package version (ADR 0002 §3 item 6). This matters for
+**external** plugins specifically: whytrail's release number moves for
+reasons that have nothing to do with the protocol (a new bundled
+integration, a CLI flag, a bug fix in `Explanation.graph()`), and an
+external plugin author shouldn't have to guess which whytrail releases
+are safe to depend on. They don't have to guess: protocol version 1 is a
 promise, not a moving target, and stays valid across whytrail's 0.x/1.x/
 2.x releases until something below actually needs to change.
 
@@ -145,12 +189,13 @@ made explicit here instead of left implicit and then broken by accident.
 Some libraries don't have a type worth registering an explainer for --
 they have their own lifecycle (a signal, a callback system, a middleware
 protocol), and the useful thing is calling `whytrail.why()` at the right
-point in it, not teaching `why()` about a new type. There's no entry
-point for this shape; the user wires it in explicitly, the same way they
-already configure the library's other hooks:
+point in it, not teaching `why()` about a new type. There's no
+auto-registration for this shape, bundled or external: the user imports
+the module and wires it in explicitly, the same way they already
+configure the library's other hooks:
 
 ```python
-# whytrail_mylib/__init__.py
+# src/whytrail/integrations/mylib.py (bundled) or whytrail_mylib/__init__.py (external)
 import whytrail
 
 def install(*, log_locals: bool = False) -> None:
@@ -162,69 +207,76 @@ def install(*, log_locals: bool = False) -> None:
         )
 ```
 
-`whytrail-celery` (signals), `whytrail-pytest` (pytest hooks), and
-`whytrail-fastapi`/`whytrail-django` (exception middleware, with a
+The `celery` integration (signals), `pytest` (pytest hooks, via the
+`pytest11` entry-point group -- see its own module docstring for why that
+one's registration is unconditional, unlike every other bundled
+integration), and `fastapi`/`django` (exception middleware, with a
 safe-by-default redaction posture) are the reference implementations.
 
-## Naming your distribution
+## Naming
 
-Convention: `whytrail-<library>`. Depend on `whytrail` and the library you're
-explaining; never the other way around.
+**Bundled**: the extra name matches the module name under
+`src/whytrail/integrations/` (hyphenated in `pyproject.toml` for
+multi-word ones, e.g. `google-cloud` -> `google_cloud.py`).
+
+**External**: convention is `whytrail-<library>`. Depend on `whytrail`
+and the library you're explaining; never the other way around.
 
 ## Testing your plugin
 
-Write tests against the real installed distribution, not a mock of the
-registry or the hook. Every plugin in `tests/plugin_contract/` follows
-this pattern: install the plugin editable, then exercise real instances
-of the type/hook you're explaining (a real `sqlalchemy.exc.IntegrityError`
-from an in-memory SQLite database, a real `ClientError` via botocore's
-`Stubber`, a real LangChain chain invocation) and assert on the result.
-If your plugin touches anything that could be sensitive, test the
-redaction default explicitly, not just the happy path -- see
+Write tests against the real installed integration, not a mock of the
+registry or the hook. Every integration in `tests/plugin_contract/`
+follows this pattern: install the extra (`pip install -e ".[mylib]"` for
+a bundled one), then exercise real instances of the type/hook you're
+explaining (a real `sqlalchemy.exc.IntegrityError` from an in-memory
+SQLite database, a real `ClientError` via botocore's `Stubber`, a real
+LangChain chain invocation) and assert on the result. If your plugin
+touches anything that could be sensitive, test the redaction default
+explicitly, not just the happy path -- see
 `tests/plugin_contract/test_fastapi_plugin.py` for the thoroughness bar
 a security-relevant integration needs to clear.
 
-## The plugins that exist today
+## The integrations that exist today
 
-30 plugins. Each earns its place by clearing one of the three bars in
-ADR 0003, verified against real objects, not assumed from documentation
--- several of these (marked *) were corrected after their own tests
-caught the library's own message text leaking a value that was supposed
-to be redacted.
+30, all bundled (ADR 0006). Each earns its place by clearing one of the
+three bars in ADR 0003, verified against real objects, not assumed from
+documentation -- several of these (marked *) were corrected after their
+own tests caught the library's own message text leaking a value that was
+supposed to be redacted.
 
-| Plugin | Shape | What it adds |
+| Extra | Shape | What it adds |
 |---|---|---|
-| [`whytrail-requests`](../plugins/whytrail-requests/) | explainer | `Response`/`RequestException` detail (method, URL, status, body) |
-| [`whytrail-httpx`](../plugins/whytrail-httpx/) | explainer | Same, for `httpx.HTTPStatusError`/`RequestError` |
-| [`whytrail-aiohttp`](../plugins/whytrail-aiohttp/) | explainer | Same, for `aiohttp.ClientResponseError`/`ClientConnectionError` |
-| [`whytrail-huggingface-hub`](../plugins/whytrail-huggingface-hub/) | explainer | `HfHubHTTPError` -- not covered by whytrail-httpx (different base class) |
-| [`whytrail-openai`](../plugins/whytrail-openai/) | explainer | `APIStatusError`/`APIConnectionError`, redacted response body |
-| [`whytrail-anthropic`](../plugins/whytrail-anthropic/) | explainer | Same, for the anthropic SDK |
-| [`whytrail-boto3`](../plugins/whytrail-boto3/) | explainer | `ClientError` structured AWS error response |
-| [`whytrail-google-cloud`](../plugins/whytrail-google-cloud/) | explainer | `GoogleAPICallError` -- one registration covers storage/bigquery/pubsub/etc. |
-| [`whytrail-sqlalchemy`](../plugins/whytrail-sqlalchemy/) | explainer | `StatementError` statement + redacted params |
-| [`whytrail-asyncpg`](../plugins/whytrail-asyncpg/)* | explainer | `PostgresError` sqlstate/constraint + redacted detail |
-| [`whytrail-pymongo`](../plugins/whytrail-pymongo/)* | explainer | `PyMongoError` code; message/details fully redacted (no safe driver string exists) |
-| [`whytrail-grpcio`](../plugins/whytrail-grpcio/) | explainer | `RpcError` status code + redacted `.details()` |
-| [`whytrail-pydantic`](../plugins/whytrail-pydantic/) | explainer | Per-field `ValidationError` breakdown, redacted bad values |
-| [`whytrail-marshmallow`](../plugins/whytrail-marshmallow/) | explainer | Per-field `ValidationError` breakdown (nested schemas too) |
-| [`whytrail-jsonschema`](../plugins/whytrail-jsonschema/)* | explainer | Path/validator; `.message`/`.instance` fully redacted |
-| [`whytrail-pyyaml`](../plugins/whytrail-pyyaml/)* | explainer | Location; `.problem`/snippet fully redacted |
-| [`whytrail-pandas`](../plugins/whytrail-pandas/) | explainer | Diagnostic for untracked DataFrame/Series; steps aside once tracked |
-| [`whytrail-polars`](../plugins/whytrail-polars/) | explainer | Same, for polars |
-| [`whytrail-sentry`](../plugins/whytrail-sentry/) | integration | Attaches explanations to Sentry events via `before_send` |
-| [`whytrail.otel`](../src/whytrail/otel.py) (core module, not a separate package) | integration | Attaches explanations to the current OpenTelemetry span |
-| [`whytrail-ddtrace`](../plugins/whytrail-ddtrace/) | integration | Same, for Datadog spans |
-| [`whytrail-celery`](../plugins/whytrail-celery/) | integration | Logs explanations (+ redacted task args) on `task_failure` |
-| [`whytrail-rq`](../plugins/whytrail-rq/) | integration | Same, via RQ's exception-handler chain |
-| [`whytrail-dramatiq`](../plugins/whytrail-dramatiq/) | integration | Same, via dramatiq middleware |
-| [`whytrail-prefect`](../plugins/whytrail-prefect/) | integration | Same, via Prefect's `on_failure` hook (no arg capture -- see its README) |
-| [`whytrail-scrapy`](../plugins/whytrail-scrapy/)† | integration | Logs explanations on `spider_error`, with the URL being parsed |
-| [`whytrail-pytest`](../plugins/whytrail-pytest/) | integration | Explanation section on failing test reports |
-| [`whytrail-fastapi`](../plugins/whytrail-fastapi/) | integration | Safe-by-default exception handler for FastAPI/Starlette |
-| [`whytrail-django`](../plugins/whytrail-django/) | integration | Safe-by-default exception middleware for Django |
-| [`whytrail-flask`](../plugins/whytrail-flask/) | integration | Same, for Flask |
-| [`whytrail-langchain`](../plugins/whytrail-langchain/) | integration | Chain/LLM/tool/retriever provenance via LangChain callbacks |
+| [`requests`](../src/whytrail/integrations/requests.py) | explainer | `Response`/`RequestException` detail (method, URL, status, body) |
+| [`httpx`](../src/whytrail/integrations/httpx.py) | explainer | Same, for `httpx.HTTPStatusError`/`RequestError` |
+| [`aiohttp`](../src/whytrail/integrations/aiohttp.py) | explainer | Same, for `aiohttp.ClientResponseError`/`ClientConnectionError` |
+| [`huggingface-hub`](../src/whytrail/integrations/huggingface_hub.py) | explainer | `HfHubHTTPError` -- not covered by `httpx` (different base class) |
+| [`openai`](../src/whytrail/integrations/openai.py) | explainer | `APIStatusError`/`APIConnectionError`, redacted response body |
+| [`anthropic`](../src/whytrail/integrations/anthropic.py) | explainer | Same, for the anthropic SDK |
+| [`boto3`](../src/whytrail/integrations/boto3.py) | explainer | `ClientError` structured AWS error response |
+| [`google-cloud`](../src/whytrail/integrations/google_cloud.py) | explainer | `GoogleAPICallError` -- one registration covers storage/bigquery/pubsub/etc. |
+| [`sqlalchemy`](../src/whytrail/integrations/sqlalchemy.py) | explainer | `StatementError` statement + redacted params |
+| [`asyncpg`](../src/whytrail/integrations/asyncpg.py)* | explainer | `PostgresError` sqlstate/constraint + redacted detail |
+| [`pymongo`](../src/whytrail/integrations/pymongo.py)* | explainer | `PyMongoError` code; message/details fully redacted (no safe driver string exists) |
+| [`grpcio`](../src/whytrail/integrations/grpcio.py) | explainer | `RpcError` status code + redacted `.details()` |
+| [`pydantic`](../src/whytrail/integrations/pydantic.py) | explainer | Per-field `ValidationError` breakdown, redacted bad values |
+| [`marshmallow`](../src/whytrail/integrations/marshmallow.py) | explainer | Per-field `ValidationError` breakdown (nested schemas too) |
+| [`jsonschema`](../src/whytrail/integrations/jsonschema.py)* | explainer | Path/validator; `.message`/`.instance` fully redacted |
+| [`pyyaml`](../src/whytrail/integrations/pyyaml.py)* | explainer | Location; `.problem`/snippet fully redacted |
+| [`pandas`](../src/whytrail/integrations/pandas.py) | explainer | Diagnostic for untracked DataFrame/Series; steps aside once tracked |
+| [`polars`](../src/whytrail/integrations/polars.py) | explainer | Same, for polars |
+| [`sentry`](../src/whytrail/integrations/sentry.py) | integration | Attaches explanations to Sentry events via `before_send` |
+| [`otel`](../src/whytrail/otel.py) (core module, always bundled) | integration | Attaches explanations to the current OpenTelemetry span |
+| [`ddtrace`](../src/whytrail/integrations/ddtrace.py) | integration | Same, for Datadog spans |
+| [`celery`](../src/whytrail/integrations/celery.py) | integration | Logs explanations (+ redacted task args) on `task_failure` |
+| [`rq`](../src/whytrail/integrations/rq.py) | integration | Same, via RQ's exception-handler chain |
+| [`dramatiq`](../src/whytrail/integrations/dramatiq.py) | integration | Same, via dramatiq middleware |
+| [`prefect`](../src/whytrail/integrations/prefect.py) | integration | Same, via Prefect's `on_failure` hook (no arg capture -- see module docstring) |
+| [`scrapy`](../src/whytrail/integrations/scrapy.py)† | integration | Logs explanations on `spider_error`, with the URL being parsed |
+| [`pytest`](../src/whytrail/integrations/pytest_plugin.py) | integration | Explanation section on failing test reports |
+| [`fastapi`](../src/whytrail/integrations/fastapi.py) | integration | Safe-by-default exception handler for FastAPI/Starlette |
+| [`django`](../src/whytrail/integrations/django.py) | integration | Safe-by-default exception middleware for Django |
+| [`flask`](../src/whytrail/integrations/flask.py) | integration | Same, for Flask |
+| [`langchain`](../src/whytrail/integrations/langchain.py) | integration | Chain/LLM/tool/retriever provenance via LangChain callbacks |
 
 † required `weak=False` on the signal connection -- the default weak
 reference let the handler closure get garbage-collected immediately
@@ -240,17 +292,25 @@ exceptions carry no structured data beyond the message string, so
 there's nothing to add over tier 1); `Playwright`/`Selenium` (need
 browser binaries this environment doesn't have); `Airflow` (heavy
 transitive dependency footprint, deferred); `LlamaIndex` (architecturally
-identical to `whytrail-langchain`'s already-proven callback pattern --
-building it would mostly duplicate work, not test anything new). See
-`docs/adr/0003-ecosystem-scale-triage.md` for the full reasoning and the
-much larger list of libraries that don't need a plugin at all.
+identical to the `langchain` integration's already-proven callback
+pattern -- building it would mostly duplicate work, not test anything
+new). See `docs/adr/0003-ecosystem-scale-triage.md` for the full
+reasoning and the much larger list of libraries that don't need a plugin
+at all.
 
-**On test coverage:** every plugin above is verified against a real
+**On test coverage:** every integration above is verified against a real
 object from the real library, including its redaction behavior where
 that applies -- not a mock, and several bugs (noted with * and †) were
-only caught because of that. That is a real, meaningful bar, and it is
-not the same claim as "battle-tested in every condition." None of these
-are tested across a version matrix, under concurrent load, against the
-library's full exception surface, or on Linux (everything here ran on
-Windows). See the coverage note in `CHANGELOG.md` for what closing that
-gap would actually require.
+only caught because of that. Every one's stated minimum dependency
+version is also confirmed to actually install and pass its tests, on
+real `ubuntu-latest` CI, not assumed from a version number or a
+Windows-only local check -- that process alone found 20 real
+version-compatibility bugs across two rounds (see
+`docs/testing-maturity.md` for the full breakdown, and
+`.github/workflows/ci.yml`'s `plugin-version-matrix` job for exactly
+which floor was corrected and why). That's a meaningfully higher bar
+than "the code looks correct," and it's still not the same claim as
+"battle-tested in every condition" -- `docs/testing-maturity.md` lists
+what's still open: the Python 3.10-3.12 range (only 3.13 has run this
+matrix so far), concurrency beyond the three web frameworks, and full
+exception-surface breadth per integration.

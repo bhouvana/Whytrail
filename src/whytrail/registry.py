@@ -34,6 +34,43 @@ EXPLAINER_PROTOCOL_VERSION = 1
 _registry: dict[type, Explainer] = {}
 _manual_types: set[type] = set()
 _entry_points_loaded = False
+_builtins_loaded = False
+
+# The 18 explainer-shaped integrations bundled into whytrail itself as
+# optional extras (ADR 0006) rather than shipped as 18 separate PyPI
+# packages -- one release process instead of many, with the underlying
+# third-party dependency only pulled in when its extra is requested
+# (`pip install whytrail[requests]`). Each name here is a real module
+# under `whytrail.integrations`; importing it is how its underlying
+# library gets checked for, not a separate lookup table that could
+# drift from what's actually on disk -- an ImportError (library not
+# installed) is indistinguishable here from "this integration doesn't
+# exist," which is the same failure mode entry-point plugins already
+# have. The 12 integration-shaped ones (hook/middleware/signal-based --
+# whytrail-celery, whytrail-fastapi, etc.) don't need this list: nothing
+# auto-registers for them, a user imports the specific
+# `whytrail.integrations.<name>` module and wires it in explicitly, the
+# same way they always have.
+_BUILTIN_EXPLAINERS = (
+    "requests",
+    "httpx",
+    "aiohttp",
+    "huggingface_hub",
+    "openai",
+    "anthropic",
+    "boto3",
+    "google_cloud",
+    "sqlalchemy",
+    "asyncpg",
+    "pymongo",
+    "grpcio",
+    "pydantic",
+    "marshmallow",
+    "jsonschema",
+    "pyyaml",
+    "pandas",
+    "polars",
+)
 
 
 def register(type_: type, explainer: Explainer) -> None:
@@ -78,9 +115,23 @@ def _load_entry_points() -> None:
             continue
 
 
+def _load_builtin_explainers() -> None:
+    global _builtins_loaded
+    if _builtins_loaded:
+        return
+    _builtins_loaded = True
+    for name in _BUILTIN_EXPLAINERS:
+        try:
+            module = importlib.import_module(f"whytrail.integrations.{name}")
+            module.register()
+        except Exception:  # noqa: BLE001 - missing extra or broken integration, either way skip it
+            continue
+
+
 def resolve_explainer(cls: type) -> Explainer | None:
     """Walk the MRO for a registered explainer -- own class first,
     then base classes, so a more specific registration always wins."""
+    _load_builtin_explainers()
     _load_entry_points()
     for klass in cls.__mro__:
         if klass in _registry:
@@ -99,9 +150,10 @@ def coerce(obj: t.Any, result: t.Any) -> Explanation | None:
 
 
 def reset() -> None:
-    """Testing hook: clear all registrations and force entry points to
-    be reloaded on next resolve."""
-    global _entry_points_loaded
+    """Testing hook: clear all registrations and force entry points and
+    builtin integrations to be reloaded on next resolve."""
+    global _entry_points_loaded, _builtins_loaded
     _registry.clear()
     _manual_types.clear()
     _entry_points_loaded = False
+    _builtins_loaded = False

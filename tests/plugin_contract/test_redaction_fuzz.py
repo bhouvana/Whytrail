@@ -115,7 +115,7 @@ _FUZZ_SETTINGS = settings(max_examples=40, deadline=None, suppress_health_check=
 @given(secret=_TRICKY_TEXT)
 def test_sqlalchemy_params_redaction(secret):
     sa = pytest.importorskip("sqlalchemy")
-    pytest.importorskip("whytrail_sqlalchemy")
+    pytest.importorskip("whytrail.integrations.sqlalchemy")
     from sqlalchemy.orm import DeclarativeBase, Session
 
     class Base(DeclarativeBase):
@@ -142,7 +142,7 @@ def test_sqlalchemy_params_redaction(secret):
 @given(secret=_TRICKY_TEXT)
 def test_pymongo_redaction(secret):
     pymongo = pytest.importorskip("pymongo")
-    pytest.importorskip("whytrail_pymongo")
+    pytest.importorskip("whytrail.integrations.pymongo")
 
     exc = pymongo.errors.OperationFailure(
         f"E11000 duplicate key error: {{ email: {secret!r} }}",
@@ -156,7 +156,7 @@ def test_pymongo_redaction(secret):
 @given(secret=_TRICKY_TEXT)
 def test_jsonschema_redaction(secret):
     jsonschema = pytest.importorskip("jsonschema")
-    pytest.importorskip("whytrail_jsonschema")
+    pytest.importorskip("whytrail.integrations.jsonschema")
 
     schema = {"type": "object", "properties": {"age": {"type": "integer"}}, "required": ["age"]}
     with pytest.raises(jsonschema.ValidationError) as excinfo:
@@ -175,7 +175,7 @@ def test_pydantic_redaction(secret):
     # docs. Excluding all-digit strings keeps every example a genuine
     # validation failure.
     pydantic = pytest.importorskip("pydantic")
-    pytest.importorskip("whytrail_pydantic")
+    pytest.importorskip("whytrail.integrations.pydantic")
 
     class FuzzModel(pydantic.BaseModel):
         age: int
@@ -190,7 +190,7 @@ def test_pydantic_redaction(secret):
 @given(secret=_TRICKY_TEXT)
 def test_asyncpg_redaction(secret):
     asyncpg = pytest.importorskip("asyncpg")
-    pytest.importorskip("whytrail_asyncpg")
+    pytest.importorskip("whytrail.integrations.asyncpg")
 
     exc = asyncpg.UniqueViolationError("duplicate key value violates unique constraint")
     exc.sqlstate = "23505"
@@ -206,7 +206,7 @@ def test_asyncpg_redaction(secret):
 @given(secret=_ASCII_TRICKY_TEXT)
 def test_pyyaml_redaction(secret):
     yaml = pytest.importorskip("yaml")
-    pytest.importorskip("whytrail_pyyaml")
+    pytest.importorskip("whytrail.integrations.pyyaml")
 
     with pytest.raises(yaml.YAMLError) as excinfo:
         yaml.safe_load(f"a: !!python/object/{secret}")
@@ -219,7 +219,7 @@ def test_pyyaml_redaction(secret):
 def test_openai_redaction(secret):
     openai = pytest.importorskip("openai")
     httpx = pytest.importorskip("httpx")
-    pytest.importorskip("whytrail_openai")
+    pytest.importorskip("whytrail.integrations.openai")
 
     request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
     response = httpx.Response(429, request=request, json={"error": {"message": "rate limited"}})
@@ -233,7 +233,7 @@ def test_openai_redaction(secret):
 def test_huggingface_hub_redaction(secret):
     httpx = pytest.importorskip("httpx")
     pytest.importorskip("huggingface_hub")
-    pytest.importorskip("whytrail_huggingface_hub")
+    pytest.importorskip("whytrail.integrations.huggingface_hub")
     from huggingface_hub.errors import HfHubHTTPError
     from huggingface_hub.utils import hf_raise_for_status
 
@@ -249,7 +249,7 @@ def test_huggingface_hub_redaction(secret):
 @given(secret=_TRICKY_TEXT)
 def test_google_cloud_redaction(secret):
     google_exceptions = pytest.importorskip("google.api_core.exceptions")
-    pytest.importorskip("whytrail_google_cloud")
+    pytest.importorskip("whytrail.integrations.google_cloud")
 
     exc = google_exceptions.NotFound("resource not found", details=[secret])
     # the detail is what's redaction-critical here; the message

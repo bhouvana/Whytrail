@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 
 asyncpg = pytest.importorskip("asyncpg")
-pytest.importorskip("whytrail_asyncpg")
+pytest.importorskip("whytrail.integrations.asyncpg")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

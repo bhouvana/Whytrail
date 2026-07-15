@@ -29,7 +29,7 @@ from .registry import coerce, register, register_from_plugin, resolve_explainer
 from .runtime.capture import track, tracked
 from .runtime.context import current_scope, default_graph, trace
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # Deliberately small: five verbs, two persistence helpers, and the two
 # names every explainer author touches (Explanation, ExplanationStep,

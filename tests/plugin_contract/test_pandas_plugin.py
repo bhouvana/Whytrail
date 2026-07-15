@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 pd = pytest.importorskip("pandas")
-pytest.importorskip("whytrail_pandas")
+pytest.importorskip("whytrail.integrations.pandas")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

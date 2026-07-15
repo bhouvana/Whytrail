@@ -1,15 +1,34 @@
 #!/usr/bin/env python
-"""Scaffold a new whytrail plugin distribution (ADR 0003).
+"""Scaffold a new *external* whytrail plugin distribution (ADR 0003, ADR 0006).
 
-Nine plugins in, the boilerplate that's identical every time is: a
-pyproject.toml with the right build backend and dependency shape, a
-package that imports whytrail's public API correctly, and a starter
-test file in the right place using the right importorskip pattern.
-What's *not* boilerplate -- and this script deliberately does not try
-to generate -- is the actual judgment call of what to explain and how,
-which is the entire point of ADR 0003's triage: most libraries don't
-need a plugin at all, and the ones that do need a real design pass,
-not a template filled in on autopilot.
+As of ADR 0006, whytrail's own 30 integrations ship bundled inside the
+whytrail package itself as optional extras (src/whytrail/integrations/,
+`pip install whytrail[requests]` etc.) -- one release process instead of
+30. This script is NOT for adding to that bundled set: if you're
+contributing a new integration directly to this repo, add a module under
+src/whytrail/integrations/, register it in registry.py's
+_BUILTIN_EXPLAINERS (explainer-shaped) or leave it to be imported
+directly (integration-shaped), and add its extra to pyproject.toml --
+see docs/plugin-guide.md.
+
+What this script generates instead is a *separate*, independently
+published plugin -- for anyone who wants to maintain their own
+integration outside this repo, discovered via the `whytrail.explainers`
+entry point the same way the bundled 30 used to work before ADR 0006.
+That mechanism was deliberately kept, not removed: it's still how a
+third party (or whytrail itself, again, if governance ever needs the
+OpenTelemetry-style core/contrib split ADR 0002 mentions) plugs in
+without a PR against this repo.
+
+The boilerplate that's identical every time is: a pyproject.toml with
+the right build backend and dependency shape, a package that imports
+whytrail's public API correctly, and a starter test file in the right
+place using the right importorskip pattern. What's *not* boilerplate --
+and this script deliberately does not try to generate -- is the actual
+judgment call of what to explain and how, which is the entire point of
+ADR 0003's triage: most libraries don't need a plugin at all, and the
+ones that do need a real design pass, not a template filled in on
+autopilot.
 
 Usage:
     python scripts/new_plugin.py requests_toolbelt --kind explainer --type RequestsToolbeltError

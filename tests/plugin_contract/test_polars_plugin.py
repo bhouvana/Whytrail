@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 pl = pytest.importorskip("polars")
-pytest.importorskip("whytrail_polars")
+pytest.importorskip("whytrail.integrations.polars")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

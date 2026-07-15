@@ -41,11 +41,11 @@ def _secret_for(i: int) -> str:
 # run in a worker thread pool via Starlette's own run_in_threadpool).
 
 fastapi = pytest.importorskip("fastapi")
-pytest.importorskip("whytrail_fastapi")
+pytest.importorskip("whytrail.integrations.fastapi")
 
 
 def test_fastapi_concurrent_requests_do_not_cross_contaminate():
-    import whytrail_fastapi
+    import whytrail.integrations.fastapi as whytrail_fastapi
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
@@ -77,11 +77,11 @@ def test_fastapi_concurrent_requests_do_not_cross_contaminate():
 # -- Flask / Django: thread-pool concurrency (WSGI's real model) ------
 
 flask = pytest.importorskip("flask")
-pytest.importorskip("whytrail_flask")
+pytest.importorskip("whytrail.integrations.flask")
 
 
 def test_flask_concurrent_requests_do_not_cross_contaminate():
-    import whytrail_flask
+    import whytrail.integrations.flask as whytrail_flask
     from flask import Flask
 
     app = Flask(__name__)
@@ -111,7 +111,7 @@ def test_flask_concurrent_requests_do_not_cross_contaminate():
 
 
 django = pytest.importorskip("django")
-pytest.importorskip("whytrail_django")
+pytest.importorskip("whytrail.integrations.django")
 
 
 def test_django_concurrent_requests_do_not_cross_contaminate():
@@ -124,7 +124,7 @@ def test_django_concurrent_requests_do_not_cross_contaminate():
     from django.test import RequestFactory
     from django.test.utils import override_settings
 
-    import whytrail_django
+    import whytrail.integrations.django as whytrail_django
 
     def _fire(i: int) -> tuple[int, str]:
         def raiser():

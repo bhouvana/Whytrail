@@ -8,10 +8,10 @@ from __future__ import annotations
 import pytest
 
 langchain_core = pytest.importorskip("langchain_core")
-pytest.importorskip("whytrail_langchain")
+pytest.importorskip("whytrail.integrations.langchain")
 
 import whytrail  # noqa: E402
-from whytrail_langchain import WhytrailCallbackHandler  # noqa: E402
+from whytrail.integrations.langchain import WhytrailCallbackHandler  # noqa: E402
 from langchain_core.runnables import RunnableLambda  # noqa: E402
 
 

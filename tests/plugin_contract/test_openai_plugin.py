@@ -8,7 +8,7 @@ import pytest
 
 openai = pytest.importorskip("openai")
 httpx = pytest.importorskip("httpx")
-pytest.importorskip("whytrail_openai")
+pytest.importorskip("whytrail.integrations.openai")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

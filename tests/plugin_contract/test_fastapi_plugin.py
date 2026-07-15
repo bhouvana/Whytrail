@@ -10,9 +10,9 @@ import logging
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
-pytest.importorskip("whytrail_fastapi")
+pytest.importorskip("whytrail.integrations.fastapi")
 
-import whytrail_fastapi  # noqa: E402
+import whytrail.integrations.fastapi as whytrail_fastapi  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 

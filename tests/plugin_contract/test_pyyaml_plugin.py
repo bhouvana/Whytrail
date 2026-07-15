@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 yaml = pytest.importorskip("yaml")
-pytest.importorskip("whytrail_pyyaml")
+pytest.importorskip("whytrail.integrations.pyyaml")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402

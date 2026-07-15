@@ -85,8 +85,11 @@ Two mechanisms
   point in the `whytrail.explainers` group points to. Never overrides a
   user's manual registration for the same type.
 
-Validated end to end with a real installable plugin distribution,
-[`plugins/whytrail-requests`](../../plugins/whytrail-requests/), covered by
+Validated end to end with a real installable plugin,
+[`src/whytrail/integrations/requests.py`](../../src/whytrail/integrations/requests.py)
+(bundled as an extra since ADR 0006; this same entry-point mechanism is
+still how an *external*, separately-published plugin registers), covered
+by
 [`tests/plugin_contract/test_requests_plugin.py`](../../tests/plugin_contract/test_requests_plugin.py)
 -- these tests exercise the actual `importlib.metadata` entry-point
 discovery path, not a mock of the registry.

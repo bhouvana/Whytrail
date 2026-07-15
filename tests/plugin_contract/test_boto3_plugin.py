@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 boto3 = pytest.importorskip("boto3")
-pytest.importorskip("whytrail_boto3")
+pytest.importorskip("whytrail.integrations.boto3")
 
 import whytrail  # noqa: E402
 from botocore.exceptions import ClientError  # noqa: E402

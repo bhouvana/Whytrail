@@ -10,12 +10,12 @@ import logging
 import pytest
 
 scrapy = pytest.importorskip("scrapy")
-pytest.importorskip("whytrail_scrapy")
+pytest.importorskip("whytrail.integrations.scrapy")
 
 from scrapy.signalmanager import SignalManager  # noqa: E402
 from twisted.python.failure import Failure  # noqa: E402
 
-import whytrail_scrapy  # noqa: E402
+import whytrail.integrations.scrapy as whytrail_scrapy  # noqa: E402
 
 
 class _Spider(scrapy.Spider):

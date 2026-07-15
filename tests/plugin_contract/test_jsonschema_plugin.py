@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 jsonschema = pytest.importorskip("jsonschema")
-pytest.importorskip("whytrail_jsonschema")
+pytest.importorskip("whytrail.integrations.jsonschema")
 
 import whytrail  # noqa: E402
 from whytrail import registry  # noqa: E402
