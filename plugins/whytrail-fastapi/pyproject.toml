@@ -11,5 +11,14 @@ license = "MIT"
 requires-python = ">=3.10"
 dependencies = ["whytrail", "starlette>=0.36"]
 
+[project.optional-dependencies]
+# The plugin itself deliberately depends only on starlette (the actual
+# integration surface) so a Starlette-only user isn't forced into the
+# heavier fastapi package. The test suite builds a real FastAPI app and
+# needs both fastapi and Starlette's TestClient (httpx-based since
+# Starlette dropped its bundled requests-based client) -- neither
+# belongs in `dependencies` above, since neither is needed at runtime.
+test = ["fastapi", "httpx"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/whytrail_fastapi"]

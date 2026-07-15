@@ -3,6 +3,53 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] - first real CI run found three bugs no local check could
+
+Pushed to `github.com/bhouvana/Whytrail` for the first time. Every prior
+verification in this project ran in one local Windows sandbox; the first
+push to real `ubuntu-latest`/`windows-latest`/`macos-latest` runners
+immediately failed 45/47 CI jobs, and every failure was a genuine gap
+this environment structurally could not have caught -- exactly the
+reason `docs/testing-maturity.md` flagged "the CI workflow has never
+executed" as the top open risk. Reproduced each locally in a from-scratch
+clone + venv (not the accumulated dev `.venv` used all session, which
+had masked two of these by having extra packages already installed) to
+confirm root cause before fixing:
+
+- **All 12 `test` job combinations failed on `mypy --strict`.**
+  `src/whytrail/otel.py` imports `opentelemetry` behind a runtime
+  try/except (correct -- it's an optional extra), but mypy still
+  resolves the import statically, and `opentelemetry-api` lives behind
+  the separate `otel` extra, not `dev`. A clean `pip install -e ".[dev]"`
+  -- exactly what CI runs -- can't satisfy it. Local mypy runs passed
+  all session because this sandbox's `.venv` had `opentelemetry-api`
+  installed from earlier, unrelated otel-plugin work. Fixed with a
+  `[[tool.mypy.overrides]]` for `opentelemetry.*` rather than adding the
+  extra to `dev` (which would force every contributor to pull in the
+  OTel SDK just to type-check, against ADR's zero-required-dependencies
+  design).
+- **`plugin-contract-tests (whytrail-fastapi)` and `(whytrail-rq)`
+  failed with pytest exit 5 ("no tests collected").** Both test files
+  use a module-level `pytest.importorskip()` for a package neither
+  plugin's own `pyproject.toml` declares (correctly -- `fastapi`/`httpx`
+  and `fakeredis` are test-simulation tools, not runtime dependencies of
+  a Starlette-level middleware or of RQ itself). A collection-time skip
+  reports as "no tests ran," not a failure, so this only surfaced as a
+  loud CI failure, not a silent gap -- but it also silently ran zero
+  redaction/safety assertions for two plugins every time the job showed
+  green before now, including the security-sensitive
+  `whytrail-fastapi`. Fixed by adding a `test` extra to each plugin's
+  `pyproject.toml` and having CI request `[test]` uniformly (pip just
+  warns for the ~28 plugins that don't declare one).
+- **`plugin-version-matrix` ran 2 jobs instead of the intended 60.**
+  `strategy.matrix.include` entries only merge into a matrix when they
+  share a key with an existing axis; a bare `plugin`/`dependency`/`floor`
+  include list shares no key with a separate `dependency-version:
+  [floor, latest]` axis, so GitHub produced 2 jobs with no plugin
+  context instead of 30 plugins x 2 versions. Not something any local
+  YAML/mypy/pytest check parses or could have caught. Fixed by making
+  every one of the 60 combinations an explicit `include` entry.
+
 ## [Unreleased] - VS Code extension scope assessment
 
 Added `docs/adr/0005-vscode-extension-scope.md`: scopes the VS Code

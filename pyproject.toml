@@ -65,5 +65,18 @@ files = ["src/whytrail"]
 # stubs/dependency installed to type-check meaningfully); this default
 # scope covers what every contributor should run locally before a core PR.
 
+[[tool.mypy.overrides]]
+# otel.py's import is deliberately optional at runtime (lazy import inside
+# a try/except, see its own docstring) -- opentelemetry-api lives behind
+# the separate `otel` extra, not `dev`, so it's genuinely not installed in
+# the environment `pip install -e ".[dev]"` produces (core has zero
+# required dependencies by design). Without this override mypy treats
+# that as import-not-found and fails strict mode for everyone, including
+# contributors who never touch OTel -- found by the first real CI run,
+# where mypy passed locally only because an earlier, unrelated task in
+# this environment had opentelemetry-api installed already.
+module = "opentelemetry.*"
+ignore_missing_imports = true
+
 [tool.hatch.metadata]
 allow-direct-references = true

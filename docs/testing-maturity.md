@@ -125,14 +125,24 @@ this document exists so nobody mistakes one for the other.
 4. **Scale and pathological input.** A validation error with hundreds
    of nested fields, a multi-gigabyte DataFrame, a malformed or huge SQL
    statement -- untested.
-5. **Cross-platform behavior.** Every test in this repository has run
-   on Windows, in one sandboxed environment (the CI workflow targets
-   Linux but has never actually executed). `whytrail-rq`'s tests use
-   `SimpleWorker` specifically because RQ's default `Worker` calls
-   `os.fork()`, which doesn't exist on Windows -- meaning the code path
-   real production deployments actually use (the default `Worker`,
-   Celery's prefork pool) has never run at all, on any OS, in this
-   repository.
+5. **Cross-platform behavior, partially closed.** The CI workflow has
+   now actually run on `ubuntu-latest`/`windows-latest`/`macos-latest`
+   (first push to `github.com/bhouvana/Whytrail`), and validated the
+   concern that prompted this item: 45 of 47 jobs failed on the very
+   first run, all three root causes real and all invisible to every
+   local check this project had run until then (see `CHANGELOG.md`'s
+   "first real CI run" entry) -- a mypy override missing for an
+   intentionally-optional import, two plugins' test files silently
+   depending on undeclared test-only tools, and a CI matrix
+   configuration bug that quietly ran 2 jobs instead of the intended
+   60. All three are fixed, but this is one data point, not a track
+   record: the OS-parity claim now rests on whatever the *next* few
+   pushes show, not on zero evidence. Separately, and still fully open:
+   `whytrail-rq`'s tests use `SimpleWorker` specifically because RQ's
+   default `Worker` calls `os.fork()`, which doesn't exist on Windows --
+   meaning the code path real production deployments actually use (the
+   default `Worker`, Celery's prefork pool) has still never run at all,
+   on any OS, in this repository.
 6. **Plugin-to-plugin interaction.** All 30 plugins have never been
    installed and exercised together in one process against the full
    registry resolution order at once.
@@ -147,9 +157,14 @@ this document exists so nobody mistakes one for the other.
   and to more of each already-covered library's exception surface, not
   just one representative field/error type per plugin.
 - **Concurrency tests for the task-queue and observability plugins.**
-- **Actually run the CI workflow on Linux** -- it's written and
-  YAML-validated but has never executed, since this environment has no
-  GitHub Actions runner.
+- **Watch the next several CI runs, not just the first.** The first run
+  found and fixed three real bugs; that's evidence the check is worth
+  having, not evidence the workflow is now trustworthy -- confidence
+  here should come from a track record, the same way it does for the
+  test suite itself.
+- **Exercise the RQ default `Worker` (fork-based) path on Linux/macOS**,
+  gated to non-Windows runners, instead of only ever testing
+  `SimpleWorker`.
 - **Scale/pathological-input tests** for the plugins most likely to
   encounter them in practice (pandas/polars with large frames,
   pydantic/jsonschema with deeply nested payloads).

@@ -11,5 +11,12 @@ license = "MIT"
 requires-python = ">=3.10"
 dependencies = ["whytrail", "rq>=1.15"]
 
+[project.optional-dependencies]
+# rq itself needs a real Redis connection at runtime, correctly not
+# declared above -- the test suite simulates one with fakeredis instead
+# of requiring an actual Redis server in CI, which is a test-only tool,
+# not something whytrail-rq depends on to function.
+test = ["fakeredis"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/whytrail_rq"]
