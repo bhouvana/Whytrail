@@ -61,9 +61,26 @@ addopts = "-ra"
 [tool.mypy]
 strict = true
 files = ["src/whytrail"]
+python_version = "3.12"
 # Plugins are checked individually in CI (each needs its own third-party
 # stubs/dependency installed to type-check meaningfully); this default
 # scope covers what every contributor should run locally before a core PR.
+#
+# python_version pinned to 3.12, independent of whichever interpreter
+# actually runs mypy: runtime/monitoring.py's sys.monitoring (PEP 669)
+# calls are correctly gated behind `MONITORING_AVAILABLE = hasattr(sys,
+# "monitoring")` and never reached on Python <3.12, but typeshed's own
+# stub for `sys` only declares `monitoring` for python_version >= 3.12 --
+# so mypy invoked from a 3.10/3.11 venv (as CI's `test` job matrix does,
+# testing the *package* across 3.10-3.13) flagged every access as
+# attr-defined even though the runtime guard is correct. Type-checking
+# assumptions shouldn't vary with whichever venv happens to invoke mypy;
+# pinning this to the newest version whose stubs cover this module's full
+# surface decouples the two, the same way otel.py's override above
+# decouples "this import is optional at runtime" from "mypy can resolve
+# it." Found the same way as that fix: the first real CI run, which is
+# the only place this project's mypy step had ever run under 3.10/3.11 --
+# every local run all session used this sandbox's single 3.13 venv.
 
 [[tool.mypy.overrides]]
 # otel.py's import is deliberately optional at runtime (lazy import inside

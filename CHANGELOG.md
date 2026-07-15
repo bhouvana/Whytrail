@@ -3,6 +3,64 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] - second CI run found eight more, real Linux this time
+
+The three-bug fix above unblocked the `test` and `plugin-contract-tests`
+jobs and expanded `plugin-version-matrix` from 2 broken jobs to 103 real
+ones -- which surfaced 8 more genuine failures, all `plugin-version-matrix`
+"floor" entries, none reproducible on this project's Windows sandbox for
+compiled/native packages (grpcio/ddtrace-style wheel gaps are
+platform-specific). Installed Docker (found not running) then WSL2 +
+`uv`-managed Python 3.13 to get a real Linux environment instead of
+guessing from Windows behavior -- every fix below was confirmed on actual
+Linux before being written here, the same discipline as the Windows-only
+findings that started this file's "found by actually testing" pattern.
+
+- **`sentry-sdk==2.0.0`**: passed a local install-and-import check but
+  crashes for real -- `copy.copy()` on frame locals breaks against
+  Python 3.13's `FrameLocalsProxy` (PEP 667). Only surfaced once a real
+  CI run exercised the actual capture path against a real exception, not
+  when checking "does it import." First working, by bisection: 2.11.0.
+- **`prefect==2.14.0` through `2.20.0`**: not fixable within the 2.x line
+  at any patch version -- `GatherTaskGroup`, prefect's own
+  `asyncio.TaskGroup` subclass, doesn't implement an abstract method
+  Python 3.13's `asyncio` added, independent of pydantic/griffe versions.
+  Moved the floor to the 3.x line entirely (3.7.8); earlier 3.x releases
+  have their own pydantic-version-drift issues (`PydanticUndefinedAnnotation`
+  against very new pydantic), so 3.0.0 doesn't work either -- the
+  historical griffe fix from the first CI round only mitigated one of
+  three unrelated compatibility issues wrapped up in the same one-line
+  matrix entry.
+- **`flask==2.3.0`**: `testing.py` reads `werkzeug.__version__`, which
+  werkzeug 3.x removed -- transitive drift, not a Flask bug. First
+  working: 2.3.3.
+- **`ddtrace==2.0.0`→`2.19.0`**: the earlier fix only checked "does it
+  import"; the test imports `ddtrace.trace.tracer`, a module-level
+  singleton that didn't exist until 2.20.0.
+- **`openai==1.0.0`, `anthropic==0.30.0`**: both plugins read
+  `exception.body`, whose shape at these floor versions doesn't match
+  what the code expects -- an SDK API-surface gap, not a Python-version
+  issue. First working: openai 1.30.0, anthropic 0.34.0 (both by
+  bisection).
+- **`huggingface_hub==0.20.0`**: `huggingface_hub.errors` (the module the
+  plugin imports) didn't exist at 0.20.0; even once it appeared at 0.22,
+  `hf_raise_for_status()`'s response handling didn't match the test's
+  constructed response until the 1.x line. First working: 1.0.0 -- a
+  major-version jump, discovered the same way prefect's was.
+- **`whytrail-fastapi`'s version-matrix entry was testing the wrong
+  thing.** `starlette` alone isn't independently testable for this
+  plugin: its test builds a real FastAPI app, so pinning `starlette` to
+  an old floor while a separately-installed `fastapi` expects a newer
+  one breaks on an unrelated `TestClient` API mismatch that has nothing
+  to do with whytrail-fastapi's own redaction logic. Switched the pinned
+  dependency to `fastapi` itself (floor 0.115.0, confirmed to both
+  resolve a starlette satisfying the plugin's real `>=0.36` floor and
+  pass the actual test).
+
+Full technical detail and the "why" behind each floor choice is in
+`.github/workflows/ci.yml`'s `plugin-version-matrix` job comment, not
+duplicated here.
+
 ## [Unreleased] - first real CI run found three bugs no local check could
 
 Pushed to `github.com/bhouvana/Whytrail` for the first time. Every prior

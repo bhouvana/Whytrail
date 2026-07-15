@@ -113,12 +113,14 @@ GitHub Action for CI.
 **On test coverage:** every plugin above is verified against a real
 object from the real library, not a mock, and every plugin's stated
 minimum dependency version is confirmed to actually install and work on
-the newest supported Python -- both caught real bugs, twelve of them
-version-compatibility gaps invisible from the version number alone (see
-`CHANGELOG.md`). It is not the same claim as "battle-tested in every
-condition": see `docs/testing-maturity.md` for exactly what is and isn't
-covered (the full Python 3.10-3.13 matrix, concurrency beyond the three
-web frameworks, and full exception-surface breadth are the current
+the newest supported Python -- both caught real bugs, twenty of them
+version-compatibility gaps invisible from the version number alone,
+eight of those found only once this project's CI actually ran on real
+Linux for the first time rather than the Windows sandbox it was built in
+(see `CHANGELOG.md`). It is not the same claim as "battle-tested in
+every condition": see `docs/testing-maturity.md` for exactly what is and
+isn't covered (the full Python 3.10-3.13 matrix, concurrency beyond the
+three web frameworks, and full exception-surface breadth are the current
 gaps).
 
 ## Status

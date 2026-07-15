@@ -6,11 +6,16 @@ real library rather than a mock, a representative sample of the
 redaction-critical ones are now property-tested rather than
 spot-checked, and the safety-critical web middleware is verified under
 real concurrent load. That's a meaningfully higher bar than "the code
-looks correct" -- it caught real bugs (see below), including twelve
-version-compatibility bugs found by actually installing every plugin's
-stated minimum dependency version rather than assuming it works. It is
-still a different and smaller claim than "works in any condition," and
-this document exists so nobody mistakes one for the other.
+looks correct" -- it caught real bugs (see below), including twenty
+version-compatibility bugs across two rounds of finding them: an initial
+local pass (Windows, before this project had ever run on real CI), and a
+second, different set found only once the workflow actually executed on
+GitHub's Linux/macOS/Windows runners for the first time -- several
+plugins this project had locally called "confirmed fine" turned out not
+to be, once something other than "does it install and import" was
+actually checked. It is still a different and smaller claim than "works
+in any condition," and this document exists so nobody mistakes one for
+the other.
 
 ## What the current test suite actually verifies
 
@@ -43,8 +48,8 @@ this document exists so nobody mistakes one for the other.
 - **A plugin's stated minimum dependency version is confirmed to
   actually install and pass its tests on the newest supported Python**,
   now for all 30 plugins -- not assumed from the version number in
-  `pyproject.toml`. This is what found the twelve version-compatibility
-  bugs below.
+  `pyproject.toml`. This is what found the twenty version-compatibility
+  bugs below, twelve locally and eight only once real CI ran.
 - **Precedence contracts hold**: a user's manual `whytrail.register()`
   always wins over a plugin's `register_from_plugin()`, verified per plugin,
   not just in core.
@@ -63,17 +68,21 @@ this document exists so nobody mistakes one for the other.
   `is_async=False`, executing the job synchronously at `enqueue()` time
   before the worker (and its exception handler) existed -- the test was
   accidentally asserting nothing.
-- **Twelve dependency-floor bugs, found by the version-matrix job**,
-  once it was extended from 2 plugins to all 30 -- every one found by
-  actually running `pip install <dep>==<stated-floor>` on Python 3.13
-  and checking whether the result imports, not by reading a changelog:
+- **Twenty dependency-floor bugs, found by the version-matrix job
+  across two rounds** -- twelve found locally (Windows) once the job
+  was extended from 2 plugins to all 30, and eight more found only once
+  the job actually ran on real `ubuntu-latest` CI for the first time.
+  The gap between the two rounds is itself a finding: several plugins a
+  local "does it install and import" check called fine turned out
+  broken the moment a real CI run actually exercised each plugin's
+  contract tests against its pinned floor.
+
+  Round one (local, install-and-import level):
   - **No prebuilt Python 3.13 wheel, source build also fails**:
     `pydantic==2.0.3` (`typing` internals changed; first working:
     2.8.0), `pyyaml==6.0` (Cython/setuptools mismatch; first working:
-    6.0.2).
-  - **No prebuilt Python 3.13 wheel anywhere, on any platform**:
-    `grpcio==1.60.0` (first working: 1.66.2), `ddtrace==2.0.0` (first
-    working: 2.19.0), `pandas==2.0.0` (first working: 2.2.3).
+    6.0.2), `grpcio==1.60.0` (first working: 1.66.2), `pandas==2.0.0`
+    (first working: 2.2.3).
   - **Installs, crashes on import -- genuine 3.13 runtime
     incompatibility, not a packaging gap**: `sqlalchemy==2.0.0` (its
     `TypingOnly` assertion predates two dunders 3.13 added to every
@@ -81,35 +90,65 @@ this document exists so nobody mistakes one for the other.
     calls a C API function with the pre-3.13 argument count; first
     working: 0.30.0).
   - **Uses a standard-library module removed by a later Python
-    version, not a dependency-vs-3.13 issue**: `marshmallow==3.0.0`
-    imports `distutils.version.LooseVersion`, removed in 3.12 by PEP
-    632 (first working, by bisection: 3.15.0).
-  - **Transitive dependency drift -- the floor's own unpinned
-    sub-dependency moved on and broke it**: `requests==2.20.0`
-    imports `urllib3.packages.six.moves`, a shim urllib3 2.0 removed
-    (first working, by bisection: 2.25.0); `prefect==2.14.0` through
-    `2.19.0` import a `griffe` internal path a later `griffe` release
-    removed (first working: 2.20.0).
+    version**: `marshmallow==3.0.0` imports
+    `distutils.version.LooseVersion`, removed in 3.12 by PEP 632
+    (first working, by bisection: 3.15.0).
+  - **Transitive dependency drift**: `requests==2.20.0` imports
+    `urllib3.packages.six.moves`, a shim urllib3 2.0 removed (first
+    working, by bisection: 2.25.0).
 
-  Every other plugin's stated floor (`boto3`, `httpx`, `flask`,
-  `django`, `celery`, `dramatiq`, `rq`, `sentry-sdk`, `langchain-core`,
-  `huggingface_hub`, `google-api-core`, `anthropic`, `openai`,
-  `pytest`, `jsonschema`, `scrapy`, `polars`, `aiohttp`, `starlette`,
-  `pymongo`) was checked the same way and confirmed to already work --
-  not assumed, just not broken. Every plugin's floor in
+  Round two (real CI, found by Docker/WSL2 reproduction on actual Linux
+  after Windows couldn't reproduce compiled-package issues reliably):
+  - **Passed local install-and-import, crashes for real**:
+    `sentry-sdk==2.0.0` copies frame locals via `copy.copy()`, which
+    breaks against Python 3.13's `FrameLocalsProxy` (PEP 667) -- only
+    surfaced once its actual capture path ran against a real exception.
+    First working, by bisection: 2.11.0.
+  - **Not fixable within the floor's major-version line at all**:
+    `prefect==2.14.0`-`2.20.0`'s `GatherTaskGroup` (its own
+    `asyncio.TaskGroup` subclass) doesn't implement an abstract method
+    3.13's `asyncio` added -- independent of the `griffe`/pydantic
+    issues also present on the same versions. Floor moved to the 3.x
+    line: 3.7.8. Same pattern for `huggingface_hub==0.20.0`: the
+    `huggingface_hub.errors` module the plugin imports didn't exist
+    until 0.22, and `hf_raise_for_status()`'s response handling didn't
+    match until the 1.x line. First working: 1.0.0.
+  - **More transitive dependency drift**: `flask==2.3.0`'s
+    `testing.py` reads `werkzeug.__version__`, removed by werkzeug 3.x
+    (first working: 2.3.3).
+  - **Plugin/test written against a newer SDK API than the stated
+    floor provides** (not a Python-version or drift issue -- just an
+    old client library): `ddtrace==2.0.0` (the test imports
+    `ddtrace.trace.tracer`, a singleton added later; first working:
+    2.20.0), `openai==1.0.0` and `anthropic==0.30.0` (both read
+    `exception.body`, whose shape didn't match until later releases;
+    first working: 1.30.0 and 0.34.0, both by bisection).
+  - **Not independently version-testable as originally set up**:
+    `whytrail-fastapi`'s entry pinned `starlette` alone, but the test
+    builds a real FastAPI app -- an old starlette floor against a
+    separately-installed newer fastapi breaks on an unrelated
+    `TestClient` API mismatch. Switched the pinned dependency to
+    `fastapi` itself (floor: 0.115.0).
+
+  Every other plugin's stated floor (`boto3`, `httpx`, `django`,
+  `celery`, `dramatiq`, `rq`, `langchain-core`, `google-api-core`,
+  `pytest`, `jsonschema`, `scrapy`, `polars`, `aiohttp`, `pymongo`) was
+  checked the same way on real CI and confirmed to already work -- not
+  assumed, just not (yet) found broken. Every plugin's floor in
   `pyproject.toml` is left as-is, since it's still technically correct
   for older supported Python versions; `.github/workflows/ci.yml`'s
   `plugin-version-matrix` job now pins the *actually*
   Python-3.13-compatible floor for every plugin instead, so a future
   dependency bump that reintroduces any of these gaps fails CI instead
-  of shipping silently.
+  of shipping silently. Full detail on each fix is in that job's own
+  comment block, not duplicated here.
 
 ## What still isn't verified
 
 1. **Version compatibility beyond Python 3.13.** The version-matrix job
    now covers all 30 plugins, but only against Python 3.13 -- 3.10/3.11/
    3.12 floors are asserted in `pyproject.toml` but never installed and
-   checked the way 3.13's were, and the twelve bugs just found on 3.13
+   checked the way 3.13's were, and the twenty bugs just found on 3.13
    alone suggest that gap isn't hypothetical either.
 2. **The library's full exception surface.** Most plugins exercise one
    or two exception subtypes out of the library's real hierarchy --
