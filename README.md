@@ -4,22 +4,6 @@
   </a>
 </p>
 
-```python
-import whytrail
-
-try:
-    apply_discount(price, code)
-except Exception as exc:
-    print(whytrail.why(exc))
-```
-
-```
-why(KeyError: 'SUMMER'):
-  [explicit] ValueError: discount code table missing region 'EU'  [pricing.py:12, in load_codes]
-      locals: region='EU', table={}
-  [explicit] which explicitly caused KeyError: 'SUMMER'  [pricing.py:31, in apply_discount]
-      locals: price=12.5, code='SUMMER'
-```
 
 (`[explicit]` / `[inferred]` / `[heuristic]` mark confidence in that step of
 the chain -- spelled out rather than left as a symbol you'd need this README
