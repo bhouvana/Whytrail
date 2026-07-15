@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "whytrail"
+version = "0.1.0"
+description = "Python tells you where. whytrail tells you why."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "whytrail contributors" }]
+keywords = ["debugging", "provenance", "explainability", "tracing", "exceptions"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Debuggers",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+rich = ["rich>=13.0"]
+cli = ["rich>=13.0"]
+otel = ["opentelemetry-api>=1.20"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-benchmark>=4.0",
+    "hypothesis>=6.100",
+    "rich>=13.0",
+    "mypy>=1.10",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocs-include-markdown-plugin>=6.0",
+]
+
+[project.scripts]
+whytrail = "whytrail.cli.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/bhouvana/Whytrail"
+Documentation = "https://bhouvana.github.io/Whytrail/"
+Issues = "https://github.com/bhouvana/Whytrail/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/whytrail"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.mypy]
+strict = true
+files = ["src/whytrail"]
+# Plugins are checked individually in CI (each needs its own third-party
+# stubs/dependency installed to type-check meaningfully); this default
+# scope covers what every contributor should run locally before a core PR.
+
+[tool.hatch.metadata]
+allow-direct-references = true

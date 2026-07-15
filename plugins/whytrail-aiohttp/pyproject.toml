@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "whytrail-aiohttp"
+version = "0.1.0"
+description = "whytrail explainer for aiohttp ClientResponseError/ClientConnectionError"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["whytrail", "aiohttp>=3.9"]
+
+[project.entry-points."whytrail.explainers"]
+aiohttp = "whytrail_aiohttp:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/whytrail_aiohttp"]

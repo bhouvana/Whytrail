@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "whytrail-pydantic"
+version = "0.1.0"
+description = "whytrail explainer for pydantic ValidationError (per-field structured errors)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["whytrail", "pydantic>=2.0"]
+
+[project.entry-points."whytrail.explainers"]
+pydantic = "whytrail_pydantic:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/whytrail_pydantic"]

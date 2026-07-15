@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "whytrail-langchain"
+version = "0.1.0"
+description = "Chain-step provenance for LangChain via a whytrail callback handler"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["whytrail", "langchain-core>=0.2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/whytrail_langchain"]

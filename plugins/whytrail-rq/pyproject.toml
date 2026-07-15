@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "whytrail-rq"
+version = "0.1.0"
+description = "Log a whytrail explanation on every RQ (Redis Queue) job failure"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["whytrail", "rq>=1.15"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/whytrail_rq"]

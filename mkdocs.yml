@@ -1,0 +1,83 @@
+site_name: whytrail
+site_description: "Python tells you where. whytrail tells you why."
+site_url: https://bhouvana.github.io/Whytrail/
+repo_url: https://github.com/bhouvana/Whytrail
+repo_name: bhouvana/Whytrail
+edit_uri: edit/main/docs/
+
+# docs/index.md and docs/changelog.md are thin include-markdown wrappers
+# around README.md and CHANGELOG.md respectively -- kept as the single
+# source of truth rather than duplicated, so this site can't silently
+# drift from what `pip install whytrail`'s PyPI page and a `git clone`
+# already show.
+docs_dir: docs
+
+nav:
+  - Home: index.md
+  - Plugin guide: plugin-guide.md
+  - Testing maturity: testing-maturity.md
+  - Architecture Decision Records:
+      - "0001 - Architecture and feasibility": adr/0001-whytrail-architecture.md
+      - "0002 - Category strategy": adr/0002-category-strategy.md
+      - "0003 - Ecosystem scale triage": adr/0003-ecosystem-scale-triage.md
+      - "0004 - Rename to whytrail": adr/0004-rename-to-whytrail.md
+      - "0005 - VS Code extension scope assessment": adr/0005-vscode-extension-scope.md
+  - Changelog: changelog.md
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      # whytrail.Explanation.graph() emits Mermaid syntax (see
+      # docs/adr/0001-whytrail-architecture.md); this lets any ```mermaid
+      # fence in these docs render as an actual diagram, not a code block.
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+  - include-markdown
+
+# These docs were written to be read on GitHub, where a relative link
+# like ../src/whytrail/registry.py resolves against the whole repo tree.
+# This site only ships docs/, so the same links are correctly flagged as
+# "not found" here -- that's not a broken link, it's a docs site that
+# doesn't include source browsing. Downgraded to informational rather
+# than rewriting ~40 links to absolute GitHub blob URLs for a gain that's
+# purely cosmetic (they already work correctly when read on GitHub itself,
+# which is how these docs are primarily meant to be read).
+validation:
+  links:
+    not_found: info

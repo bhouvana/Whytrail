@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "whytrail-jsonschema"
+version = "0.1.0"
+description = "whytrail explainer for jsonschema ValidationError (path, validator, instance)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["whytrail", "jsonschema>=4.0"]
+
+[project.entry-points."whytrail.explainers"]
+jsonschema = "whytrail_jsonschema:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/whytrail_jsonschema"]

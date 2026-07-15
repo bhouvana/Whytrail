@@ -1,0 +1,50 @@
+name: "whytrail run"
+description: "Run a Python script and explain any uncaught exception with whytrail instead of a bare traceback."
+branding:
+  icon: "help-circle"
+  color: "orange"
+
+inputs:
+  script:
+    description: "Path to the Python script to run"
+    required: true
+  args:
+    description: "Arguments to pass to the script"
+    required: false
+    default: ""
+  python-version:
+    description: "Python version to set up before running"
+    required: false
+    default: "3.x"
+  graph:
+    description: "Include a Mermaid provenance graph in the explanation output"
+    required: false
+    default: "false"
+  extra-packages:
+    description: "Space-separated extra packages to install alongside whytrail (e.g. plugin distributions your script needs, like whytrail-requests)"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install whytrail
+      shell: bash
+      run: |
+        pip install whytrail
+        if [ -n "${{ inputs.extra-packages }}" ]; then
+          pip install ${{ inputs.extra-packages }}
+        fi
+
+    - name: Run script with whytrail
+      shell: bash
+      run: |
+        FLAGS=""
+        if [ "${{ inputs.graph }}" = "true" ]; then
+          FLAGS="--graph"
+        fi
+        whytrail run $FLAGS "${{ inputs.script }}" -- ${{ inputs.args }}
