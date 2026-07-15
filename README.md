@@ -90,14 +90,16 @@ are extras of this same package, not new verbs -- see
 
 ## Ecosystem
 
-30 integrations today, each earning its place by clearing one of three
-bars (structured error data, a security-sensitive boundary, or a
-non-standard capture mechanism) rather than existing just to exist --
-see `docs/adr/0003-ecosystem-scale-triage.md` for the full reasoning,
-the next candidates, and the much longer list of libraries deliberately
-*not* wrapped, because generic `track()`/`@tracked` already covers them
-with zero extra code. Full table with what each one adds:
-`docs/plugin-guide.md`.
+33 integrations today and growing, each earning its place by clearing
+one of three bars (structured error data, a security-sensitive
+boundary, or a non-standard capture mechanism) rather than existing
+just to exist -- see `docs/adr/0003-ecosystem-scale-triage.md` for the
+full reasoning, the next candidates, and the much longer list of
+libraries deliberately *not* wrapped, because generic `track()`/
+`@tracked` already covers them with zero extra code, or because they
+were checked directly and found to carry no structured data beyond
+what tier 1 already shows for free. Full table with what each one
+adds: `docs/plugin-guide.md`.
 
 | | | |
 |---|---|---|
@@ -107,12 +109,13 @@ with zero extra code. Full table with what each one adds:
 | `whytrail[asyncpg]` | `whytrail[pymongo]` | `whytrail[grpcio]` |
 | `whytrail[pydantic]` | `whytrail[marshmallow]` | `whytrail[jsonschema]` |
 | `whytrail[pyyaml]` | `whytrail[pandas]` | `whytrail[polars]` |
+| `whytrail[stripe]` | `whytrail[alembic]` | `whytrail[paramiko]` |
 | `whytrail[sentry]` | `whytrail[ddtrace]` | `whytrail[celery]` |
 | `whytrail[rq]` | `whytrail[dramatiq]` | `whytrail[prefect]` |
 | `whytrail[scrapy]` | `whytrail[pytest]` | `whytrail[fastapi]` |
 | `whytrail[django]` | `whytrail[flask]` | `whytrail[langchain]` |
 
-All 30 in one install: `pip install whytrail[all]`. Want to publish your
+All of the above in one install: `pip install whytrail[all]`. Want to publish your
 own, outside this repo, for a library not on this list?
 `python scripts/new_plugin.py <library> --kind explainer|integration`
 scaffolds that (ADR 0006 -- the entry-point extensibility mechanism the

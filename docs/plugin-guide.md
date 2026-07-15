@@ -238,11 +238,14 @@ a security-relevant integration needs to clear.
 
 ## The integrations that exist today
 
-30, all bundled (ADR 0006). Each earns its place by clearing one of the
+33, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
+batch-by-batch progress). Each earns its place by clearing one of the
 three bars in ADR 0003, verified against real objects, not assumed from
 documentation -- several of these (marked *) were corrected after their
 own tests caught the library's own message text leaking a value that was
-supposed to be redacted.
+supposed to be redacted. Not every popular library clears the bar: see
+"Checked and not built" below for candidates found, on inspection, to
+carry no structured data beyond what tier 1 already shows for free.
 
 | Extra | Shape | What it adds |
 |---|---|---|
@@ -264,6 +267,9 @@ supposed to be redacted.
 | [`pyyaml`](../src/whytrail/integrations/pyyaml.py)* | explainer | Location; `.problem`/snippet fully redacted |
 | [`pandas`](../src/whytrail/integrations/pandas.py) | explainer | Diagnostic for untracked DataFrame/Series; steps aside once tracked |
 | [`polars`](../src/whytrail/integrations/polars.py) | explainer | Same, for polars |
+| [`stripe`](../src/whytrail/integrations/stripe.py) | explainer | `StripeError` code/param/http_status, redacted response body |
+| [`alembic`](../src/whytrail/integrations/alembic.py) | explainer | `ResolutionError`/`MultipleHeads` -- the actual bad revision id / ambiguous heads |
+| [`paramiko`](../src/whytrail/integrations/paramiko.py) | explainer | `BadHostKeyException` as key fingerprints, never raw key material |
 | [`sentry`](../src/whytrail/integrations/sentry.py) | integration | Attaches explanations to Sentry events via `before_send` |
 | [`otel`](../src/whytrail/otel.py) (core module, always bundled) | integration | Attaches explanations to the current OpenTelemetry span |
 | [`ddtrace`](../src/whytrail/integrations/ddtrace.py) | integration | Same, for Datadog spans |
@@ -294,7 +300,11 @@ browser binaries this environment doesn't have); `Airflow` (heavy
 transitive dependency footprint, deferred); `LlamaIndex` (architecturally
 identical to the `langchain` integration's already-proven callback
 pattern -- building it would mostly duplicate work, not test anything
-new). See `docs/adr/0003-ecosystem-scale-triage.md` for the full
+new); **`PyJWT` and `cryptography`** (checked directly, same reasoning as
+`redis-py`: their exceptions carry no structured fields beyond the
+message -- real value captured instead as gloss/fix-table entries for
+`.plain_text`, not a full plugin that would add code without adding
+information). See `docs/adr/0003-ecosystem-scale-triage.md` for the full
 reasoning and the much larger list of libraries that don't need a plugin
 at all.
 

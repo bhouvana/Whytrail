@@ -3,6 +3,52 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] - 3 new integrations (batch 1 of the 30-to-60 push): stripe, alembic, paramiko
+
+First batch of growing the integration count, each checked against
+ADR 0003's actual bar (structured error data a bare traceback throws
+away) by inspecting real library objects before writing any code, not
+assumed from popularity:
+
+- **`stripe`**: `StripeError`'s `.code`/`.param`/`.http_status`/
+  `.json_body` -- the same "why did this payment fail" structured-error
+  shape already proven for openai/anthropic. Body goes through
+  `locals`, redacted by default (a payment error can echo back request
+  detail).
+- **`alembic`**: `ResolutionError`/`MultipleHeads` -- directly motivated
+  by a real bug hit debugging this project's own CI earlier
+  (a stale `prefect.db` producing a confusing "no such revision" error
+  with no indication of what argument or how many heads were involved).
+- **`paramiko`**: `BadHostKeyException`'s `.expected_key`/`.key` --
+  shown as fingerprints (the standard, safe way to identify an SSH key),
+  never raw key material.
+
+**Two candidates downgraded, not forced in:** `PyJWT` and
+`cryptography` were both checked directly and found to carry no
+structured fields beyond their own message -- the same "nothing to add
+over tier 1" reasoning that's kept `redis-py` off the list since the
+original 30. Real value without a full plugin: ~10 of their exception
+types added to the plain-English gloss/fix tables instead (`.plain_text`
+now glosses `ExpiredSignatureError`, `InvalidSignature`, etc.).
+
+**Two real bugs found and fixed before this ever reached a commit,**
+by the same discipline that's caught everything else this session:
+- `whytrail-paramiko`'s first draft read `exc.got_key`, but the actual
+  stored attribute is `exc.key` (the constructor parameter is named
+  `got_key`; the stored attribute isn't) -- found because `why()`
+  silently swallows an explainer's own exceptions and falls through to
+  the generic tier-1 fallback, which *looked* like working output until
+  a test asserted on content only the plugin could produce.
+- All three new integrations were initially unreachable: added as
+  modules and as `pyproject.toml` extras, but never added to
+  `registry._BUILTIN_EXPLAINERS` -- the actual discovery list. Every
+  `test_plugin_is_discovered()` assertion failed loudly, which is
+  exactly why that assertion exists in every plugin's test file.
+
+pyproject.toml gained `stripe`/`alembic`/`paramiko` extras (floors not
+yet verified against real CI the way the original 30's were -- that's
+still pending). 264 tests pass total; `mypy --strict` clean.
+
 ## [Unreleased] - fixed: why() was blind to ExceptionGroup's sub-exceptions
 
 Found by actually raising one, not by reasoning about the type in the

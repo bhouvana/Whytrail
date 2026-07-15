@@ -51,6 +51,22 @@ _EXCEPTION_GLOSS = {
     "JSONDecodeError": "tried to read text that wasn't valid JSON",
     "ExceptionGroup": "several independent things failed at the same time (common in concurrent code)",
     "BaseExceptionGroup": "several independent things failed at the same time (common in concurrent code)",
+    # PyJWT and cryptography (0.2.1): both checked directly for a
+    # dedicated integration and found to carry no structured fields
+    # beyond their own message (unlike e.g. stripe's .code/.param) --
+    # nothing a bare traceback throws away, so nothing for a full
+    # explainer plugin to add. Gloss/fix table entries are still real,
+    # cheap value, the same reasoning that keeps redis-py off the
+    # integration list entirely (docs/plugin-guide.md).
+    "ExpiredSignatureError": "an authentication token's expiration time has passed",
+    "InvalidAudienceError": "an authentication token was issued for a different service than the one checking it",
+    "InvalidIssuerError": "an authentication token wasn't issued by the party that's supposed to have issued it",
+    "InvalidSignatureError": "an authentication token's signature doesn't match -- wrong key, or the token was tampered with",
+    "InvalidTokenError": "an authentication token failed validation",
+    "DecodeError": "couldn't parse an authentication token -- it's malformed, not just invalid",
+    "InvalidToken": "a decryption key didn't match, or the encrypted data was corrupted or tampered with",
+    "InvalidSignature": "a cryptographic signature didn't match the data it's supposed to verify",
+    "InvalidKey": "a cryptographic key wasn't the right shape or format for what it was used for",
 }
 
 _PLAIN_CONFIDENCE_NOTE = {
@@ -95,6 +111,15 @@ _EXCEPTION_FIXES = {
     "JSONDecodeError": "check the source actually returned valid JSON -- print the raw text before parsing it",
     "ExceptionGroup": "look at each sub-exception below individually -- they're independent failures, not a single chain",
     "BaseExceptionGroup": "look at each sub-exception below individually -- they're independent failures, not a single chain",
+    "ExpiredSignatureError": "the token needs to be refreshed/reissued -- check the client's refresh flow, not just this request",
+    "InvalidAudienceError": "check the token was actually issued for this service, and that the `audience` check matches",
+    "InvalidIssuerError": "check the token came from the issuer this code expects, and that the `issuer` check matches",
+    "InvalidSignatureError": "check both sides are using the same signing key/algorithm, and that the token wasn't modified in transit",
+    "InvalidTokenError": "inspect the token's claims and compare against what the validator expects (audience, issuer, expiry)",
+    "DecodeError": "check the token wasn't truncated or corrupted before it reached the decoder",
+    "InvalidToken": "check the same key used to encrypt is being used to decrypt, and that the data wasn't modified",
+    "InvalidSignature": "check the signing and verifying keys are a matching pair, and the data wasn't modified after signing",
+    "InvalidKey": "check the key was generated for this algorithm/purpose and hasn't been truncated or corrupted",
 }
 
 _EXCEPTION_TYPE_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*): (.*)", re.DOTALL)

@@ -53,6 +53,9 @@ jsonschema = ["jsonschema>=4.0"]
 pyyaml = ["pyyaml>=6.0"]
 pandas = ["pandas>=2.0"]
 polars = ["polars>=0.20"]
+stripe = ["stripe>=7.0"]
+alembic = ["alembic>=1.7"]
+paramiko = ["paramiko>=2.7"]
 
 # Integration-shaped (hook/middleware/signal-based, ADR 0006): the extra
 # only pulls in the dependency -- nothing auto-registers, since these
@@ -75,7 +78,7 @@ langchain = ["langchain-core>=0.2"]
 # CI matrices -- not meant as a typical user's default (see ADR 0006 for
 # why each stays its own extra instead of always installing everything).
 all = [
-    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain]",
+    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain]",
 ]
 
 dev = [

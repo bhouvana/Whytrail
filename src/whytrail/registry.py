@@ -70,6 +70,9 @@ _BUILTIN_EXPLAINERS = (
     "pyyaml",
     "pandas",
     "polars",
+    "stripe",
+    "alembic",
+    "paramiko",
 )
 
 
