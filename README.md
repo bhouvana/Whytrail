@@ -1,6 +1,6 @@
-# whytrail
-
-Python tells you *where* something happened. `whytrail` tells you *why*.
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="whytrail — Python tells you where something happened. whytrail tells you why." width="100%">
+</p>
 
 ```python
 import whytrail
