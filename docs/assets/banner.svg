@@ -1,47 +1,47 @@
 <svg width="1200" height="440" viewBox="0 0 1200 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="whytrail — Python tells you where. whytrail tells you why.">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#100e0c"/>
-      <stop offset="100%" stop-color="#17130f"/>
+      <stop offset="0%" stop-color="#0a1930"/>
+      <stop offset="100%" stop-color="#132a4a"/>
     </linearGradient>
   </defs>
 
   <rect width="1200" height="440" fill="url(#bg)"/>
-  <rect width="1200" height="440" fill="none" stroke="#2a241c" stroke-width="1"/>
+  <rect width="1200" height="440" fill="none" stroke="#1c3a5e" stroke-width="1"/>
 
   <!-- terminal chrome -->
-  <circle cx="34" cy="34" r="6" fill="#4a4038"/>
-  <circle cx="56" cy="34" r="6" fill="#4a4038"/>
-  <circle cx="78" cy="34" r="6" fill="#4a4038"/>
-  <text x="1166" y="39" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#5a5044">why.py</text>
-  <line x1="24" y1="58" x2="1176" y2="58" stroke="#2a241c" stroke-width="1"/>
+  <circle cx="34" cy="34" r="6" fill="#2c4a6e"/>
+  <circle cx="56" cy="34" r="6" fill="#2c4a6e"/>
+  <circle cx="78" cy="34" r="6" fill="#ffd43b"/>
+  <text x="1166" y="39" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#4d6580">why.py</text>
+  <line x1="24" y1="58" x2="1176" y2="58" stroke="#1c3a5e" stroke-width="1"/>
 
   <!-- wordmark -->
-  <text x="60" y="140" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="60" font-weight="700" fill="#f2ede4">whytrail</text>
+  <text x="60" y="140" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="60" font-weight="700" fill="#eaf2fb">whytrail</text>
 
   <!-- tagline -->
-  <text x="62" y="178" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="19" fill="#8a8072">
-    Python tells you <tspan font-style="italic" fill="#b8ac98">where</tspan> something happened. whytrail tells you <tspan font-style="italic" fill="#e8a33d">why</tspan>.
+  <text x="62" y="178" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="19" fill="#7d93ad">
+    Python tells you <tspan font-style="italic" fill="#a9c3de">where</tspan> something happened. whytrail tells you <tspan font-style="italic" fill="#ffd43b">why</tspan>.
   </text>
 
-  <line x1="24" y1="204" x2="1176" y2="204" stroke="#2a241c" stroke-width="1"/>
+  <line x1="24" y1="204" x2="1176" y2="204" stroke="#1c3a5e" stroke-width="1"/>
 
   <!-- terminal output excerpt, real why() output -->
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20">
-    <text x="60" y="252" fill="#f2ede4">why(KeyError: 'SUMMER'):</text>
+    <text x="60" y="252" fill="#eaf2fb">why(KeyError: 'SUMMER'):</text>
 
     <text x="60" y="288">
-      <tspan fill="#e8a33d">  [explicit]</tspan><tspan fill="#c9c0b2"> ValueError: discount code table missing region 'EU'</tspan>
+      <tspan fill="#ffd43b">  [explicit]</tspan><tspan fill="#c7d3e0"> ValueError: discount code table missing region 'EU'</tspan>
     </text>
-    <text x="60" y="316" fill="#5a5044">      pricing.py:12, in load_codes</text>
+    <text x="60" y="316" fill="#4d6580">      pricing.py:12, in load_codes</text>
 
     <text x="60" y="352">
-      <tspan fill="#e8a33d">  [explicit]</tspan><tspan fill="#c9c0b2"> which explicitly caused KeyError: 'SUMMER'</tspan>
+      <tspan fill="#ffd43b">  [explicit]</tspan><tspan fill="#c7d3e0"> which explicitly caused KeyError: 'SUMMER'</tspan>
     </text>
-    <text x="60" y="380" fill="#5a5044">      pricing.py:31, in apply_discount</text>
+    <text x="60" y="380" fill="#4d6580">      pricing.py:31, in apply_discount</text>
   </g>
 
   <!-- install pill -->
-  <rect x="900" y="376" width="276" height="44" rx="8" fill="#1c1712" stroke="#3a3226" stroke-width="1"/>
-  <text x="922" y="404" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="17" fill="#c9c0b2">$ <tspan fill="#e8a33d">pip install whytrail</tspan></text>
+  <rect x="884" y="376" width="292" height="44" rx="8" fill="#0d1f36" stroke="#2c4a6e" stroke-width="1"/>
+  <text x="906" y="404" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="17" fill="#c7d3e0">$ <tspan fill="#ffd43b">pip install whytrail</tspan></text>
 </svg>
