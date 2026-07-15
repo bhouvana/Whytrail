@@ -3,6 +3,31 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] - plain-English explanations and fix suggestions
+
+- **`Explanation.plain_text`**: a prose rendering of the exact same
+  steps `.text` shows, phrased for someone without a programming
+  background -- no new dependency, no LLM call, and no less honest
+  than `.text`: every sentence is a direct paraphrase of a step already
+  present, never new information. Common builtin exceptions (`KeyError`,
+  `ValueError`, `ConnectionError`, ~25 total) get a plain-English gloss
+  from a small, curated table; anything outside that table keeps its own
+  name rather than getting a guessed-at description (ADR §11's "never
+  fabricate" applies to prose phrasing exactly as much as it applies to
+  the causal chain itself). `.text` is unchanged and stays the default --
+  this is additive, not a replacement.
+- **"How to avoid this" guidance**: known exception types also get a
+  line of general, well-established advice (check the key exists before
+  indexing, validate the input, retry with backoff, ...) -- framed
+  explicitly as guidance for that *class* of error, not a diagnosis of
+  this specific failure, since whytrail has no way to know a fix
+  actually applies here. Surfaced in `.plain_text` and as a new
+  `"suggestion"` field in `.json()` (`None` when there's no guidance for
+  that type, never a guessed-at one).
+- 12 new tests covering both features (glossing, fallback for unglossed
+  types, non-exception steps left alone, confidence hedging, redaction
+  interaction). 248 tests pass total; `mypy --strict` clean.
+
 ## [Unreleased] - unified all 30 plugins into extras of one package (ADR 0006)
 
 A fresh-install smoke test of the real PyPI package (not the local

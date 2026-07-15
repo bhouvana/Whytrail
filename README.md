@@ -35,6 +35,24 @@ why(3.14): unknown -- no provenance captured.
 for the full reasoning behind that design choice, and why a fully automatic
 `why(anything)` isn't possible in the first place.
 
+## Plain-English output
+
+`whytrail.why(exc).text` is terse and technical, by design. For someone
+who doesn't read tracebacks for a living, `.plain_text` renders the exact
+same facts as prose, with general guidance for common exception types --
+paraphrase, not new information, same honesty guarantee as `.text`:
+
+```
+Here's what happened, from the root cause to the final result:
+
+1. ValueError -- got a value that didn't make sense for what it was doing (discount code table missing region 'EU') -- in load_codes(), line 12 of pricing.py
+   At that point: region was 'EU', table was {}.
+   How to avoid this: validate the value before using it, or check what produced it further up this chain.
+2. KeyError -- tried to look up something that wasn't there ('SUMMER') -- in apply_discount(), line 31 of pricing.py
+   At that point: price was 12.5, code was 'SUMMER'.
+   How to avoid this: check the key exists before accessing it (`if key in d`), or use `d.get(key, default)` instead of `d[key]`.
+```
+
 ## Install
 
 ```bash
