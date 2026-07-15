@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import sys
+
+import pytest
+
 import whytrail
 from whytrail.core.node import Confidence
 
@@ -108,3 +112,55 @@ def test_why_never_raises_even_on_hostile_object():
     # why() must degrade to "unknown" rather than propagate the failure
     explanation = whytrail.why(Hostile())
     assert explanation.known is False
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="ExceptionGroup requires Python 3.11+")
+def test_why_expands_exception_group_sub_exceptions():
+    # ExceptionGroup (asyncio.TaskGroup and friends, PEP 654) bundles
+    # multiple *independent* failures into one exception -- without this,
+    # why() only saw the group's own generic wrapper message and hid the
+    # real sub-exceptions entirely, found by actually raising one, not by
+    # reasoning about the type in the abstract.
+    try:
+        raise ExceptionGroup(  # noqa: F821 - builtin as of 3.11, guarded by skipif above
+            "multiple failures",
+            [ValueError("task A failed"), KeyError("task B failed")],
+        )
+    except ExceptionGroup as exc:  # noqa: F821
+        explanation = whytrail.why(exc)
+
+    assert len(explanation.steps) == 3  # the group itself, plus both sub-exceptions
+    assert "ExceptionGroup" in explanation.steps[0].description
+    assert "ValueError: task A failed" in explanation.steps[1].description
+    assert "sub-exception 1 of 2" in explanation.steps[1].description
+    assert "KeyError" in explanation.steps[2].description
+    assert "sub-exception 2 of 2" in explanation.steps[2].description
+    # every step is explicit -- these are all directly-known facts, not inferred
+    assert all(step.confidence == Confidence.EXPLICIT.value for step in explanation.steps)
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="ExceptionGroup requires Python 3.11+")
+def test_why_caps_exception_group_expansion_at_max_group_exceptions():
+    from whytrail.explainers.builtin import MAX_GROUP_EXCEPTIONS
+
+    sub_exceptions = [ValueError(f"failure {i}") for i in range(MAX_GROUP_EXCEPTIONS + 3)]
+    try:
+        raise ExceptionGroup("many failures", sub_exceptions)  # noqa: F821
+    except ExceptionGroup as exc:  # noqa: F821
+        explanation = whytrail.why(exc)
+
+    # group step + capped sub-exceptions + one "N more not shown" step
+    assert len(explanation.steps) == 1 + MAX_GROUP_EXCEPTIONS + 1
+    assert "more sub-exception" in explanation.steps[-1].description
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="ExceptionGroup requires Python 3.11+")
+def test_why_plain_text_glosses_exception_group_and_its_sub_exceptions():
+    try:
+        raise ExceptionGroup("multiple failures", [ValueError("bad input")])  # noqa: F821
+    except ExceptionGroup as exc:  # noqa: F821
+        explanation = whytrail.why(exc)
+
+    text = explanation.plain_text
+    assert "several independent things failed at the same time" in text
+    assert "got a value that didn't make sense" in text

@@ -49,6 +49,8 @@ _EXCEPTION_GLOSS = {
     "UnicodeDecodeError": "tried to read text using the wrong character encoding",
     "UnicodeEncodeError": "tried to write text using the wrong character encoding",
     "JSONDecodeError": "tried to read text that wasn't valid JSON",
+    "ExceptionGroup": "several independent things failed at the same time (common in concurrent code)",
+    "BaseExceptionGroup": "several independent things failed at the same time (common in concurrent code)",
 }
 
 _PLAIN_CONFIDENCE_NOTE = {
@@ -91,6 +93,8 @@ _EXCEPTION_FIXES = {
     "UnicodeDecodeError": "check the file/data is actually encoded the way it's being decoded (e.g. try encoding='utf-8')",
     "UnicodeEncodeError": "check the target encoding can represent every character in the text",
     "JSONDecodeError": "check the source actually returned valid JSON -- print the raw text before parsing it",
+    "ExceptionGroup": "look at each sub-exception below individually -- they're independent failures, not a single chain",
+    "BaseExceptionGroup": "look at each sub-exception below individually -- they're independent failures, not a single chain",
 }
 
 _EXCEPTION_TYPE_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*): (.*)", re.DOTALL)

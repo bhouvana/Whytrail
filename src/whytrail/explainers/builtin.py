@@ -18,6 +18,7 @@ from ..core.explanation import Explanation, ExplanationStep
 from ..core.node import Confidence
 
 MAX_LOCALS = 8
+MAX_GROUP_EXCEPTIONS = 5
 
 _RELATION_PHRASE = {
     "explicit": "which explicitly caused",
@@ -34,18 +35,65 @@ def explain_exception(exc: BaseException, *, max_depth: int = 8) -> Explanation:
     steps: list[ExplanationStep] = []
     for i, item in enumerate(items):
         if i == 0:
-            steps.append(_step_for(item, Confidence.EXPLICIT.value))
+            steps.extend(_steps_for(item, Confidence.EXPLICIT.value, max_depth=max_depth))
         else:
             relation = relations[i - 1]
-            steps.append(
-                _step_for(
+            steps.extend(
+                _steps_for(
                     item,
                     _RELATION_CONFIDENCE[relation],
                     connective=_RELATION_PHRASE[relation],
+                    max_depth=max_depth,
                 )
             )
     subject = f"{type(exc).__name__}: {exc}"
     return Explanation(subject=subject, steps=steps, tracked=True)
+
+
+def _steps_for(
+    exc: BaseException,
+    confidence: float,
+    connective: str | None = None,
+    *,
+    max_depth: int = 8,
+    _depth: int = 0,
+) -> list[ExplanationStep]:
+    """Usually one step; more for a BaseExceptionGroup (Python 3.11+,
+    what asyncio.TaskGroup and friends raise for structured concurrent
+    failures). A group's whole point is bundling multiple *independent*
+    failures into one exception -- showing only the group's own generic
+    "N sub-exceptions" message and stopping there (which is what this
+    function did before this fix) hides exactly the information anyone
+    catching one of these actually wants. `.exceptions` is duck-typed
+    via getattr rather than an isinstance check against
+    (Base)ExceptionGroup, which doesn't exist as a name before 3.11 --
+    same pattern as MONITORING_AVAILABLE's hasattr check elsewhere in
+    this codebase for another 3.12-only feature."""
+    step = _step_for(exc, confidence, connective=connective)
+    sub_exceptions = getattr(exc, "exceptions", None)
+    if not sub_exceptions or _depth >= max_depth:
+        return [step]
+    steps = [step]
+    total = len(sub_exceptions)
+    for i, sub in enumerate(sub_exceptions[:MAX_GROUP_EXCEPTIONS], start=1):
+        steps.extend(
+            _steps_for(
+                sub,
+                Confidence.EXPLICIT.value,
+                connective=f"sub-exception {i} of {total}:",
+                max_depth=max_depth,
+                _depth=_depth + 1,
+            )
+        )
+    if total > MAX_GROUP_EXCEPTIONS:
+        steps.append(
+            ExplanationStep(
+                description=f"...and {total - MAX_GROUP_EXCEPTIONS} more sub-exception(s) not shown",
+                confidence=Confidence.EXPLICIT.value,
+                kind="exception",
+            )
+        )
+    return steps
 
 
 def _causal_chain(

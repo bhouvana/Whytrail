@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] - fixed: why() was blind to ExceptionGroup's sub-exceptions
+
+Found by actually raising one, not by reasoning about the type in the
+abstract: `why()` on a Python 3.11+ `ExceptionGroup` (what
+`asyncio.TaskGroup` and structured-concurrency code raise) only showed
+the group's own generic wrapper message ("unhandled errors in a
+TaskGroup (2 sub-exceptions)") and completely missed the actual
+sub-exceptions that caused it -- exactly the information anyone
+catching one of these needs.
+
+- `explain_exception()` now walks into `.exceptions` (duck-typed via
+  `getattr`, since `(Base)ExceptionGroup` doesn't exist as a name before
+  3.11 -- same pattern as `MONITORING_AVAILABLE`'s `hasattr` check
+  elsewhere for another version-gated feature) and adds a step per
+  sub-exception, recursively for nested groups, capped at
+  `MAX_GROUP_EXCEPTIONS = 5` with a "N more not shown" step beyond that.
+- `ExceptionGroup`/`BaseExceptionGroup` added to the plain-English gloss
+  and fix-suggestion tables.
+- 3 new tests, `skipif`-guarded and verified on a real Python 3.10
+  interpreter (WSL2 + `uv`) to confirm the file still collects and skips
+  correctly pre-3.11, not just that the guard *looks* right.
+- 251 tests pass total; `mypy --strict` clean.
+
 ## [Unreleased] - plain-English explanations and fix suggestions
 
 - **`Explanation.plain_text`**: a prose rendering of the exact same
