@@ -1,8 +1,6 @@
-<p align="center">
-  <a href="https://pypi.org/project/whytrail/">
-    <img src="docs/assets/banner.svg" alt="whytrail — Python tells you where something happened. whytrail tells you why. pip install whytrail" width="100%">
-  </a>
-</p>
+# whytrail
+
+Python tells you *where* something happened. `whytrail` tells you *why*.
 
 ## Two tiers, one function
 
