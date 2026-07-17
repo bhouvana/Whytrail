@@ -13,8 +13,111 @@ the plugin unification), not from memory of what was released when.
 
 ## [0.2.1] - elasticsearch, batch-1 plugin growth, plain-English explanations, ExceptionGroup support
 
-Seven units of work since 0.2.0, newest first. 309 tests pass total;
+Nine units of work since 0.2.0, newest first. 369 tests pass total;
 `mypy --strict` clean.
+
+### 7 new integrations (batch 6 of the 30-to-60 push, target reached): psycopg, cassandra, influxdb, pyzmq, zeep, elastic-apm, bugsnag
+
+**60/60.** The last batch of the push this whole session was scoped
+around (ADR 0003's original triage, revived as a concrete target
+several sessions ago). `pymemcache` and `pysolr` were also researched
+this batch and rejected (see below).
+
+- **`psycopg`** (the v3 rewrite): a genuinely different verdict than
+  `psycopg2`, which ADR 0003 already found blocked -- `.pgcode` there
+  is a C-level read-only attribute, populated only by a real
+  PostgreSQL connection. `psycopg`'s `.sqlstate` is a plain, settable
+  Python attribute, confirmed directly by constructing one and setting
+  it, not assumed from the successor relationship. (The richer `.diag`
+  object's fields *are* still read-only outside a real connection --
+  this plugin deliberately doesn't use them, staying more modest than
+  `whytrail-asyncpg`'s async-only coverage of the same database.)
+- **`cassandra`**: registers against `RequestExecutionException`
+  specifically, not the driver's top-level `DriverException` --
+  checked directly that the sibling `InvalidRequest` type (a different
+  branch, `RequestValidationException`) carries nothing but a plain
+  message, so registering any broader would have silently produced
+  useless output for the most common query-error case. The types this
+  *does* cover (`Unavailable`/`WriteTimeout`/`ReadTimeout`) carry real
+  consistency-level detail -- and confirmed no redaction concern
+  exists either, since every field is coordination metadata, never
+  query content.
+- **`influxdb`**: `ApiException`'s `.status`/`.reason`/`.body`, the
+  same structured HTTP-API-error shape already proven for
+  `boto3`/`elasticsearch`.
+- **`pyzmq`**: `ZMQError`'s `.errno` -- `str(exc)` renders *only*
+  `.strerror` (e.g. `"Unknown error"`), dropping the numeric errno
+  code entirely, so a bare traceback doesn't even show which error
+  this was. No redaction concern (OS/protocol-level codes only).
+- **`zeep`**: SOAP `Fault`'s `.code`/`.message`/`.detail` -- SOAP
+  faults commonly embed the raw offending XML in their detail, redacted
+  accordingly.
+- **`elastic-apm`**/**`bugsnag`**: two more integration-shaped
+  (hook-based) plugins, the same custom-attribute-attachment pattern as
+  `newrelic`/`rollbar`/`honeybadger`/`ddtrace`/`otel`.
+
+**Rejected, with reasons:** `pymemcache` -- every exception class in
+its hierarchy, checked down to the `MemcacheIllegalInputError` leaf, is
+a bare `pass` with nothing beyond a message. `pysolr` -- confirmed by
+reading every `raise SolrError(...)` call site in the driver's own
+source, all of them pass a pre-formatted string, no structured kwargs
+anywhere.
+
+pyproject.toml gained `psycopg`/`cassandra`/`influxdb`/`pyzmq`/`zeep`/
+`elastic-apm`/`bugsnag` extras -- all floors guesses, not yet bisected
+against real CI.
+
+### 9 new integrations (batch 5 of the 30-to-60 push): pymysql, pymssql, clickhouse, snowflake, graphql-core, tenacity, newrelic, rollbar, honeybadger
+
+The largest single batch so far, past the halfway point to 60 (53/60).
+`duckdb` was also researched this batch and rejected (see below).
+
+The largest single batch so far, past the halfway point to 60 (53/60).
+`duckdb` was also researched this batch and rejected (see below).
+
+- **`pymysql`**/**`pymssql`**: both carry `(code, message)` in `.args`,
+  the same shape as `pyodbc` -- MySQL's numeric errno and SQL Server's
+  DB-Lib code respectively, message redacted.
+- **`clickhouse`** (clickhouse-connect): `.code`/`.name` are only
+  populated by the real driver's raise site (confirmed by reading
+  `httpclient.py`'s `raise err_type(err_str, code=code, name=name)`
+  directly, not by hand-constructing an exception and assuming the
+  fields would be set the same way -- a bare construction leaves both
+  `None`).
+- **`snowflake`**: the richest of this batch --
+  `.errno`/`.sqlstate`/`.sfqid` safe in `description`, `.raw_msg`/
+  `.query` (the literal failed SQL) redacted, the same posture as
+  SQLAlchemy's bound params.
+- **`graphql-core`**: registers against `graphql.GraphQLError`
+  directly rather than against strawberry-graphql specifically --
+  strawberry, Ariadne, and graphene are all built on graphql-core's
+  execution engine, so one registration covers all three. `.path` (the
+  resolver path, e.g. `["user","profile","ssn"]`) safe in
+  `description`; `.message` redacted.
+- **`tenacity`**: structurally different from every other plugin in
+  this ecosystem -- `str()` on a bare `RetryError` doesn't squash
+  structured data into one line, it hides the actual failure entirely
+  (`RetryError[<Future ... raised ValueError>]`). This explainer
+  unwraps `.last_attempt.exception()` and delegates to `why()`
+  recursively, the same "expand into the real cause" approach already
+  used for `ExceptionGroup`'s sub-exceptions, rather than extracting
+  fields the way every other plugin does.
+- **`newrelic`**/**`rollbar`**/**`honeybadger`**: three new
+  integration-shaped (hook-based) plugins, all the same shape as the
+  existing `ddtrace`/`otel` span-attachment pattern -- attach a
+  flattened, redacted-by-default `Explanation` as custom
+  attributes/extra data on the respective service's own error-reporting
+  call (`notice_error()`/`report_exc_info()`/`notify()`).
+
+**`duckdb` rejected, with reasons:** `duckdb.Error` is `Exception`-shaped
+with nothing beyond `.args` -- confirmed via `dir(exc)` on a real
+`CatalogException` from an in-memory database, no separate code or
+location attribute exists even though the message text itself contains
+a line/column reference. Same shape and same verdict as `tomllib`.
+
+pyproject.toml gained `pymysql`/`pymssql`/`clickhouse`/`snowflake`/
+`graphql-core`/`tenacity`/`newrelic`/`rollbar`/`honeybadger` extras --
+all floors guesses, not yet bisected against real CI.
 
 ### 3 new integrations (batch 4 of the 30-to-60 push): google-genai, oracledb, confluent-kafka
 

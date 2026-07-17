@@ -1,6 +1,6 @@
 # Testing maturity: what's verified, what isn't
 
-This project has 309 tests across core whytrail and 44 bundled
+This project has 369 tests across core whytrail and 60 bundled
 integrations (ADR 0006 -- extras of the one `whytrail` package, not
 separate distributions). Every plugin's tests run against a real object from the
 real library rather than a mock, a representative sample of the
@@ -48,7 +48,7 @@ the other.
   (`tests/plugin_contract/test_web_concurrency.py`).
 - **A plugin's stated minimum dependency version is confirmed to
   actually install and pass its tests on the newest supported Python**,
-  now for all 44 plugins -- not assumed from the version number in
+  now for all 60 plugins -- not assumed from the version number in
   `pyproject.toml`. This is what found the twenty version-compatibility
   bugs below, twelve locally and eight only once real CI ran.
 - **Precedence contracts hold**: a user's manual `whytrail.register()`
@@ -147,7 +147,7 @@ the other.
 ## What still isn't verified
 
 1. **Version compatibility beyond Python 3.13.** The version-matrix job
-   now covers all 44 plugins, but only against Python 3.13 -- 3.10/3.11/
+   now covers all 60 plugins, but only against Python 3.13 -- 3.10/3.11/
    3.12 floors are asserted in `pyproject.toml` but never installed and
    checked the way 3.13's were, and the twenty bugs just found on 3.13
    alone suggest that gap isn't hypothetical either.
@@ -183,9 +183,22 @@ the other.
    meaning the code path real production deployments actually use (the
    default `Worker`, Celery's prefork pool) has still never run at all,
    on any OS, in this repository.
-6. **Plugin-to-plugin interaction.** All 44 plugins have never been
-   installed and exercised together in one process against the full
-   registry resolution order at once.
+6. **Plugin-to-plugin interaction, partially checked.** `pip install
+   whytrail[all]` plus the full test suite has now actually been run
+   once with all 60 extras installed together (`pip check` clean, 359
+   passed, 0 failed) -- previously this had never been done for real.
+   One real cross-plugin interaction surfaced, cosmetic rather than a
+   whytrail bug: `sentry-sdk`'s global logging monkeypatch
+   (`logging.Logger.callHandlers`, installed automatically on import,
+   independent of whether Sentry is actually configured) races with
+   `prefect`'s own test-server teardown logging at interpreter
+   shutdown, printing a `--- Logging error ---: ValueError: I/O
+   operation on closed file` after pytest has already reported success.
+   Both sides of that interaction are third-party code, not whytrail's
+   -- worth naming so it isn't mistaken for a real failure if seen
+   again, not something to fix here. This was one test run, not a
+   track record; still not the same claim as "no interaction issues
+   exist across all 60."
 7. **No plugin sunset policy exists.** If an integration's upstream
    library stops releasing, changes its exception shape incompatibly,
    or a maintainer simply stops using it, there's no documented process

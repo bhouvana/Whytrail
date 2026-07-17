@@ -84,6 +84,17 @@ _BUILTIN_EXPLAINERS = (
     "google_genai",
     "oracledb",
     "confluent_kafka",
+    "pymysql",
+    "pymssql",
+    "clickhouse",
+    "snowflake",
+    "graphql_core",
+    "tenacity",
+    "psycopg",
+    "cassandra",
+    "influxdb",
+    "pyzmq",
+    "zeep",
 )
 
 

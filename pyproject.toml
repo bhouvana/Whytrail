@@ -67,6 +67,17 @@ pyodbc = ["pyodbc>=4.0"]
 google-genai = ["google-genai>=1.0"]
 oracledb = ["oracledb>=2.0"]
 confluent-kafka = ["confluent-kafka>=2.0"]
+pymysql = ["pymysql>=1.0"]
+pymssql = ["pymssql>=2.2"]
+clickhouse = ["clickhouse-connect>=0.6"]
+snowflake = ["snowflake-connector-python>=3.0"]
+graphql-core = ["graphql-core>=3.2"]
+tenacity = ["tenacity>=8.0"]
+psycopg = ["psycopg>=3.1"]
+cassandra = ["cassandra-driver>=3.25"]
+influxdb = ["influxdb-client>=1.30"]
+pyzmq = ["pyzmq>=24.0"]
+zeep = ["zeep>=4.1"]
 
 # Integration-shaped (hook/middleware/signal-based, ADR 0006): the extra
 # only pulls in the dependency -- nothing auto-registers, since these
@@ -84,12 +95,17 @@ fastapi = ["starlette>=0.36"]
 django = ["django>=4.2"]
 flask = ["flask>=2.3"]
 langchain = ["langchain-core>=0.2"]
+newrelic = ["newrelic>=9.0"]
+rollbar = ["rollbar>=1.0"]
+honeybadger = ["honeybadger>=0.15"]
+elastic-apm = ["elastic-apm>=6.15"]
+bugsnag = ["bugsnag>=4.5"]
 
 # Every integration above in one install, for trying whytrail broadly or
 # CI matrices -- not meant as a typical user's default (see ADR 0006 for
 # why each stays its own extra instead of always installing everything).
 all = [
-    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sendgrid,websockets,opensearch,pyodbc,google-genai,oracledb,confluent-kafka,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain]",
+    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sendgrid,websockets,opensearch,pyodbc,google-genai,oracledb,confluent-kafka,pymysql,pymssql,clickhouse,snowflake,graphql-core,tenacity,psycopg,cassandra,influxdb,pyzmq,zeep,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain,newrelic,rollbar,honeybadger,elastic-apm,bugsnag]",
 ]
 
 dev = [

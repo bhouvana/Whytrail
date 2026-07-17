@@ -106,6 +106,22 @@ jobs:
           - google-genai
           - oracledb
           - confluent-kafka
+          - pymysql
+          - pymssql
+          - clickhouse
+          - snowflake
+          - graphql-core
+          - tenacity
+          - newrelic
+          - rollbar
+          - honeybadger
+          - psycopg
+          - cassandra
+          - influxdb
+          - pyzmq
+          - zeep
+          - elastic-apm
+          - bugsnag
     steps:
       - uses: actions/checkout@v4
 
@@ -397,6 +413,38 @@ jobs:
           - { extra: oracledb, dependency: oracledb, floor: "2.0.0", dependency-version: latest }
           - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.0.0", dependency-version: floor }
           - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.0.0", dependency-version: latest }
+          - { extra: pymysql, dependency: pymysql, floor: "1.0.0", dependency-version: floor }
+          - { extra: pymysql, dependency: pymysql, floor: "1.0.0", dependency-version: latest }
+          - { extra: pymssql, dependency: pymssql, floor: "2.2.0", dependency-version: floor }
+          - { extra: pymssql, dependency: pymssql, floor: "2.2.0", dependency-version: latest }
+          - { extra: clickhouse, dependency: clickhouse-connect, floor: "0.6.0", dependency-version: floor }
+          - { extra: clickhouse, dependency: clickhouse-connect, floor: "0.6.0", dependency-version: latest }
+          - { extra: snowflake, dependency: snowflake-connector-python, floor: "3.0.0", dependency-version: floor }
+          - { extra: snowflake, dependency: snowflake-connector-python, floor: "3.0.0", dependency-version: latest }
+          - { extra: graphql-core, dependency: graphql-core, floor: "3.2.0", dependency-version: floor }
+          - { extra: graphql-core, dependency: graphql-core, floor: "3.2.0", dependency-version: latest }
+          - { extra: tenacity, dependency: tenacity, floor: "8.0.0", dependency-version: floor }
+          - { extra: tenacity, dependency: tenacity, floor: "8.0.0", dependency-version: latest }
+          - { extra: newrelic, dependency: newrelic, floor: "9.0.0", dependency-version: floor }
+          - { extra: newrelic, dependency: newrelic, floor: "9.0.0", dependency-version: latest }
+          - { extra: rollbar, dependency: rollbar, floor: "1.0.0", dependency-version: floor }
+          - { extra: rollbar, dependency: rollbar, floor: "1.0.0", dependency-version: latest }
+          - { extra: honeybadger, dependency: honeybadger, floor: "0.15.0", dependency-version: floor }
+          - { extra: honeybadger, dependency: honeybadger, floor: "0.15.0", dependency-version: latest }
+          - { extra: psycopg, dependency: psycopg, floor: "3.1.0", dependency-version: floor }
+          - { extra: psycopg, dependency: psycopg, floor: "3.1.0", dependency-version: latest }
+          - { extra: cassandra, dependency: cassandra-driver, floor: "3.25.0", dependency-version: floor }
+          - { extra: cassandra, dependency: cassandra-driver, floor: "3.25.0", dependency-version: latest }
+          - { extra: influxdb, dependency: influxdb-client, floor: "1.30.0", dependency-version: floor }
+          - { extra: influxdb, dependency: influxdb-client, floor: "1.30.0", dependency-version: latest }
+          - { extra: pyzmq, dependency: pyzmq, floor: "24.0.0", dependency-version: floor }
+          - { extra: pyzmq, dependency: pyzmq, floor: "24.0.0", dependency-version: latest }
+          - { extra: zeep, dependency: zeep, floor: "4.1.0", dependency-version: floor }
+          - { extra: zeep, dependency: zeep, floor: "4.1.0", dependency-version: latest }
+          - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15.0", dependency-version: floor }
+          - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15.0", dependency-version: latest }
+          - { extra: bugsnag, dependency: bugsnag, floor: "4.5.0", dependency-version: floor }
+          - { extra: bugsnag, dependency: bugsnag, floor: "4.5.0", dependency-version: latest }
     steps:
       - uses: actions/checkout@v4
 

@@ -245,8 +245,10 @@ a security-relevant integration needs to clear.
 
 ## The integrations that exist today
 
-44, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
-batch-by-batch progress). Each earns its place by clearing one of the
+60, all bundled (ADR 0006) -- the original target this ecosystem push
+was scoped against, reached (see `CHANGELOG.md` for batch-by-batch
+progress and ADR 0003 for whether that number should keep growing or
+this is a natural resting point). Each earns its place by clearing one of the
 three bars in ADR 0003, verified against real objects, not assumed from
 documentation -- several of these (marked *) were corrected after their
 own tests caught the library's own message text leaking a value that was
@@ -288,6 +290,17 @@ carry no structured data beyond what tier 1 already shows for free.
 | [`google-genai`](../src/whytrail/integrations/google_genai.py) | explainer | `APIError` code/status + redacted response message (not the deprecated `google-generativeai`) |
 | [`oracledb`](../src/whytrail/integrations/oracledb.py) | explainer | `Error`'s `full_code`/`offset` + redacted driver message |
 | [`confluent-kafka`](../src/whytrail/integrations/confluent_kafka.py) | explainer | `KafkaException`'s error name/fatal/retriable + redacted broker message |
+| [`pymysql`](../src/whytrail/integrations/pymysql.py) | explainer | `Error` errno + redacted driver message |
+| [`pymssql`](../src/whytrail/integrations/pymssql.py) | explainer | `Error` code + redacted driver message |
+| [`clickhouse`](../src/whytrail/integrations/clickhouse.py) | explainer | `ClickHouseError` code/name + redacted driver message |
+| [`snowflake`](../src/whytrail/integrations/snowflake.py) | explainer | `Error` errno/sqlstate/sfqid + redacted message/query |
+| [`graphql-core`](../src/whytrail/integrations/graphql_core.py) | explainer | `GraphQLError` resolver path + redacted message (covers strawberry-graphql, Ariadne, graphene) |
+| [`tenacity`](../src/whytrail/integrations/tenacity.py) | explainer | Unwraps `RetryError` to the real underlying exception via recursive `why()`, not a field extraction |
+| [`psycopg`](../src/whytrail/integrations/psycopg.py) | explainer | `Error.sqlstate` (settable, unlike psycopg2's blocked `.pgcode`) + redacted message |
+| [`cassandra`](../src/whytrail/integrations/cassandra.py) | explainer | `RequestExecutionException` (Unavailable/WriteTimeout/ReadTimeout) consistency-level detail, no redaction needed |
+| [`influxdb`](../src/whytrail/integrations/influxdb.py) | explainer | `ApiException` status/reason + redacted response body |
+| [`pyzmq`](../src/whytrail/integrations/pyzmq.py) | explainer | `ZMQError` errno that bare `str(exc)` drops entirely, no redaction needed |
+| [`zeep`](../src/whytrail/integrations/zeep.py) | explainer | SOAP `Fault` code + redacted message/detail |
 | [`sentry`](../src/whytrail/integrations/sentry.py) | integration | Attaches explanations to Sentry events via `before_send` |
 | [`otel`](../src/whytrail/otel.py) (core module, always bundled) | integration | Attaches explanations to the current OpenTelemetry span |
 | [`ddtrace`](../src/whytrail/integrations/ddtrace.py) | integration | Same, for Datadog spans |
@@ -301,6 +314,11 @@ carry no structured data beyond what tier 1 already shows for free.
 | [`django`](../src/whytrail/integrations/django.py) | integration | Safe-by-default exception middleware for Django |
 | [`flask`](../src/whytrail/integrations/flask.py) | integration | Same, for Flask |
 | [`langchain`](../src/whytrail/integrations/langchain.py) | integration | Chain/LLM/tool/retriever provenance via LangChain callbacks |
+| [`newrelic`](../src/whytrail/integrations/newrelic.py) | integration | Attaches explanations to New Relic error events via `notice_error()` |
+| [`rollbar`](../src/whytrail/integrations/rollbar.py) | integration | Attaches explanations to Rollbar reports via `report_exc_info()` |
+| [`honeybadger`](../src/whytrail/integrations/honeybadger.py) | integration | Attaches explanations to Honeybadger notifications via `notify()` |
+| [`elastic-apm`](../src/whytrail/integrations/elastic_apm.py) | integration | Attaches explanations to Elastic APM error events via `capture_exception()` |
+| [`bugsnag`](../src/whytrail/integrations/bugsnag.py) | integration | Attaches explanations to Bugsnag reports via `notify()` |
 
 † required `weak=False` on the signal connection -- the default weak
 reference let the handler closure get garbage-collected immediately
