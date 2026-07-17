@@ -330,8 +330,16 @@ jobs:
           - { extra: pika, dependency: pika, floor: "1.1.0", dependency-version: latest }
           - { extra: kubernetes, dependency: kubernetes, floor: "18.20.0", dependency-version: floor }
           - { extra: kubernetes, dependency: kubernetes, floor: "18.20.0", dependency-version: latest }
-          - { extra: azure-core, dependency: azure-core, floor: "1.24.0", dependency-version: floor }
-          - { extra: azure-core, dependency: azure-core, floor: "1.24.0", dependency-version: latest }
+          # azure-core==1.24.0 (the original aspirational floor):
+          # ModuleNotFoundError: No module named 'cgi' -- azure/core/rest/
+          # _helpers.py imports the stdlib cgi module, removed in Python
+          # 3.13 (PEP 594). A genuine Python 3.13 stdlib-removal
+          # incompatibility in azure-core's own code, not a whytrail bug
+          # (same category as marshmallow==3.0.0's distutils.version
+          # removal, below). Bisected on real Linux: still broken at
+          # 1.26.0, fixed at 1.27.0.
+          - { extra: azure-core, dependency: azure-core, floor: "1.27.0", dependency-version: floor }
+          - { extra: azure-core, dependency: azure-core, floor: "1.27.0", dependency-version: latest }
           - { extra: sendgrid, dependency: sendgrid, floor: "6.0.0", dependency-version: floor }
           - { extra: sendgrid, dependency: sendgrid, floor: "6.0.0", dependency-version: latest }
           - { extra: websockets, dependency: websockets, floor: "12.0", dependency-version: floor }

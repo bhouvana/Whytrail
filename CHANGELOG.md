@@ -123,6 +123,16 @@ pyproject.toml gained `pika`/`kubernetes`/`azure-core` extras (floors
 from the research, not yet bisected against real CI the way the
 batch-1 floors were).
 
+**Real CI confirmed `pika`'s and `kubernetes`' guessed floors on the
+first try -- no bug, breaking the streak batch 1 set.** `azure-core`
+wasn't as lucky:
+- `azure-core==1.24.0`: `ModuleNotFoundError: No module named 'cgi'` --
+  `azure/core/rest/_helpers.py` imports the stdlib `cgi` module,
+  removed in Python 3.13 (PEP 594). A genuine stdlib-removal
+  incompatibility in azure-core's own code, the same category as
+  `marshmallow==3.0.0`'s `distutils.version` removal below. First
+  working, by bisection on real Linux: `1.27.0`.
+
 ### 1 new integration (batch 2 of the 30-to-60 push): elasticsearch
 
 `elasticsearch.ApiError` (covering `NotFoundError`, `ConflictError`,
