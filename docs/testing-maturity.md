@@ -186,6 +186,16 @@ the other.
 6. **Plugin-to-plugin interaction.** All 41 plugins have never been
    installed and exercised together in one process against the full
    registry resolution order at once.
+7. **No plugin sunset policy exists.** If an integration's upstream
+   library stops releasing, changes its exception shape incompatibly,
+   or a maintainer simply stops using it, there's no documented process
+   for deprecating or removing that plugin -- it just stays in
+   `registry._BUILTIN_EXPLAINERS` indefinitely. `ci.yml`'s weekly
+   schedule trigger (added alongside this note) closes the *detection*
+   half of this gap -- a floor break from a new upstream release no
+   longer waits for an unrelated push to this repo to surface -- but
+   detection isn't the same as a policy for what happens next when one
+   fires and nobody's actively working on that plugin.
 
 ## What closing the rest of this gap would require
 

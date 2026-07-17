@@ -4,9 +4,22 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Every plugin floor is only ever checked against whatever the
+    # dependency's index served on the day someone pushed to this repo
+    # (see docs/testing-maturity.md's plugin-health gap). A library
+    # release that breaks a floor after that day goes undetected until
+    # the next unrelated push happens to touch this file's matrix again
+    # -- this catches that gap by re-running the version-matrix weekly
+    # regardless of push activity. Monday 06:00 UTC, arbitrary but fixed.
+    - cron: "0 6 * * 1"
 
 jobs:
   test:
+    # Skip on the weekly schedule trigger: this job doesn't touch plugin
+    # dependency floors (the thing that goes stale between pushes), so
+    # re-running it weekly would just burn CI minutes for no new signal.
+    if: github.event_name != 'schedule'
     strategy:
       fail-fast: false
       matrix:
@@ -38,6 +51,12 @@ jobs:
     # (pandas, sqlalchemy, fastapi, ...), and installing all 30 into the
     # core matrix would make every core-only change pay for every
     # integration's install time.
+    #
+    # Skip on the weekly schedule trigger, same reasoning as `test`
+    # above: this job checks contract behavior against whatever `pip`
+    # resolves today, not the pinned floor -- plugin-version-matrix
+    # below is the one that actually exercises floor drift.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -380,6 +399,8 @@ jobs:
           pytest "tests/plugin_contract/test_${test_name}_plugin.py" -q
 
   benchmarks:
+    # Skip on the weekly schedule trigger, same reasoning as `test` above.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
