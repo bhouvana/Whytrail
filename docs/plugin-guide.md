@@ -245,7 +245,7 @@ a security-relevant integration needs to clear.
 
 ## The integrations that exist today
 
-41, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
+44, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
 batch-by-batch progress). Each earns its place by clearing one of the
 three bars in ADR 0003, verified against real objects, not assumed from
 documentation -- several of these (marked *) were corrected after their
@@ -285,6 +285,9 @@ carry no structured data beyond what tier 1 already shows for free.
 | [`websockets`](../src/whytrail/integrations/websockets.py) | explainer | `ConnectionClosed` close code + redacted close reason |
 | [`opensearch`](../src/whytrail/integrations/opensearch.py) | explainer | `TransportError` status/error + redacted response info (elasticsearch-py fork, same shape) |
 | [`pyodbc`](../src/whytrail/integrations/pyodbc.py) | explainer | `Error` SQLSTATE code + redacted driver message |
+| [`google-genai`](../src/whytrail/integrations/google_genai.py) | explainer | `APIError` code/status + redacted response message (not the deprecated `google-generativeai`) |
+| [`oracledb`](../src/whytrail/integrations/oracledb.py) | explainer | `Error`'s `full_code`/`offset` + redacted driver message |
+| [`confluent-kafka`](../src/whytrail/integrations/confluent_kafka.py) | explainer | `KafkaException`'s error name/fatal/retriable + redacted broker message |
 | [`sentry`](../src/whytrail/integrations/sentry.py) | integration | Attaches explanations to Sentry events via `before_send` |
 | [`otel`](../src/whytrail/otel.py) (core module, always bundled) | integration | Attaches explanations to the current OpenTelemetry span |
 | [`ddtrace`](../src/whytrail/integrations/ddtrace.py) | integration | Same, for Datadog spans |

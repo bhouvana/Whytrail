@@ -13,8 +13,53 @@ the plugin unification), not from memory of what was released when.
 
 ## [0.2.1] - elasticsearch, batch-1 plugin growth, plain-English explanations, ExceptionGroup support
 
-Six units of work since 0.2.0, newest first. 297 tests pass total;
+Seven units of work since 0.2.0, newest first. 309 tests pass total;
 `mypy --strict` clean.
+
+### 3 new integrations (batch 4 of the 30-to-60 push): google-genai, oracledb, confluent-kafka
+
+Checked directly against real objects, not docs. `fastavro` and
+`paho-mqtt` were also researched this batch and rejected (see below).
+
+- **`google-genai`**: the *current* Gemini API SDK, not the deprecated
+  `google-generativeai` (a `FutureWarning` fires on import pointing at
+  this successor -- confirmed directly, not assumed from a version
+  number). `google-generativeai`'s errors route through
+  `google.api_core.exceptions.GoogleAPICallError`, already covered by
+  the existing `whytrail-google-cloud` plugin; `google-genai` is
+  architecturally separate, its own `google.genai.errors.APIError`
+  hierarchy with `.code`/`.status`/`.message`/`.details`. `.message`
+  redacted (echoes back the offending request detail, e.g. a
+  content-safety rejection quoting the input); `.code`/`.status` safe
+  in `description`.
+- **`oracledb`**: `Error`'s `args[0]` is a real `_Error` object
+  carrying `.full_code` (a stable `"ORA-12545"`-style taxonomy) and
+  `.offset` -- confirmed via a real (thin-mode) connection attempt
+  against an unreachable host, no live Oracle database needed. Unlike
+  `psycopg2`, whose equivalent `.pgcode`/`.pgerror` ADR 0003 already
+  found are C-level read-only attributes populated only by a real
+  connection -- a different constraint, checked separately rather than
+  assumed to be the same problem. `.message` redacted; `.full_code`/
+  `.offset` safe in `description`.
+- **`confluent-kafka`**: not the same verdict as the already-rejected
+  `kafka-python` -- `KafkaException.args[0]` is a real, per-instance
+  `KafkaError` object (`.name()`/`.fatal()`/`.retriable()`), unlike
+  `kafka-python`'s class-level static constants. `.str()` (librdkafka's
+  own message) redacted; `.name()`/`.fatal()`/`.retriable()` safe in
+  `description`.
+
+**Rejected, with reasons:** `fastavro` -- `UnknownType`'s only
+attribute (`.name`) duplicates its own `str(exc)` exactly, and a
+malformed-container-file read raises a plain `ValueError` with no
+structured data at all. `paho-mqtt` -- `Client.connect()` returns an
+`MQTTErrorCode` enum rather than raising, so there's no exception
+object for `why()` to explain; the one real exception class
+(`WebsocketConnectionError`) carries nothing beyond a bare message.
+
+pyproject.toml gained `google-genai`/`oracledb`/`confluent-kafka`
+extras (floors `google-genai>=1.0`, `oracledb>=2.0`,
+`confluent-kafka>=2.0` -- all guesses, not yet bisected against real
+CI).
 
 ### 4 new integrations (batch 3 of the 30-to-60 push): sendgrid, websockets, opensearch, pyodbc
 

@@ -81,6 +81,9 @@ _BUILTIN_EXPLAINERS = (
     "websockets",
     "opensearch",
     "pyodbc",
+    "google_genai",
+    "oracledb",
+    "confluent_kafka",
 )
 
 
