@@ -411,16 +411,44 @@ jobs:
           - { extra: google-genai, dependency: google-genai, floor: "1.0.0", dependency-version: latest }
           - { extra: oracledb, dependency: oracledb, floor: "2.0.0", dependency-version: floor }
           - { extra: oracledb, dependency: oracledb, floor: "2.0.0", dependency-version: latest }
-          - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.0.0", dependency-version: floor }
-          - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.0.0", dependency-version: latest }
+          # confluent-kafka==2.0.0 (the original aspirational floor): never
+          # published -- PyPI jumps 1.9.2 -> 2.0.2 directly. 2.0.2 through
+          # 2.5.0 all fail to build from source ("librdkafka/rdkafka.h" not
+          # found -- confluent-kafka needs the system librdkafka C library
+          # and headers at those versions, not just a Python-version issue).
+          # First version with a self-contained prebuilt wheel bundling
+          # librdkafka (no system dependency needed), confirmed on real
+          # Linux: 2.6.0.
+          - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.6.0", dependency-version: floor }
+          - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.6.0", dependency-version: latest }
           - { extra: pymysql, dependency: pymysql, floor: "1.0.0", dependency-version: floor }
           - { extra: pymysql, dependency: pymysql, floor: "1.0.0", dependency-version: latest }
-          - { extra: pymssql, dependency: pymssql, floor: "2.2.0", dependency-version: floor }
-          - { extra: pymssql, dependency: pymssql, floor: "2.2.0", dependency-version: latest }
-          - { extra: clickhouse, dependency: clickhouse-connect, floor: "0.6.0", dependency-version: floor }
-          - { extra: clickhouse, dependency: clickhouse-connect, floor: "0.6.0", dependency-version: latest }
-          - { extra: snowflake, dependency: snowflake-connector-python, floor: "3.0.0", dependency-version: floor }
-          - { extra: snowflake, dependency: snowflake-connector-python, floor: "3.0.0", dependency-version: latest }
+          # pymssql==2.2.0 (the original aspirational floor): fails to build
+          # from source on Python 3.13 (no cp313 wheel published at this
+          # version); every 2.2.x patch through 2.2.11 and even 2.3.0 have
+          # the same gap. First version with a cp313 wheel, confirmed on
+          # real Linux: 2.3.1.
+          - { extra: pymssql, dependency: pymssql, floor: "2.3.1", dependency-version: floor }
+          - { extra: pymssql, dependency: pymssql, floor: "2.3.1", dependency-version: latest }
+          # clickhouse-connect==0.6.0 (the original aspirational floor):
+          # ModuleNotFoundError: No module named 'pkg_resources' at import
+          # time (setuptools deprecation/removal drift, same category as
+          # snowflake-connector-python below) -- fixed by 0.7.0. But 0.7.0
+          # through 1.2.0 still fail this plugin's actual contract test:
+          # ClickHouseError's code=/name= keyword-argument constructor (the
+          # plugin's whole reason for existing -- see clickhouse.py's
+          # docstring) doesn't exist until 1.3.0. Confirmed by installing
+          # each candidate and running the real contract test against it on
+          # real Linux, not just checking "does it import."
+          - { extra: clickhouse, dependency: clickhouse-connect, floor: "1.3.0", dependency-version: floor }
+          - { extra: clickhouse, dependency: clickhouse-connect, floor: "1.3.0", dependency-version: latest }
+          # snowflake-connector-python==3.0.0 (the original aspirational
+          # floor): ModuleNotFoundError: No module named 'pkg_resources' at
+          # build time -- same setuptools-deprecation category as
+          # clickhouse-connect above. Confirmed still broken at 3.5.0; first
+          # working version found by bisection on real Linux: 3.10.0.
+          - { extra: snowflake, dependency: snowflake-connector-python, floor: "3.10.0", dependency-version: floor }
+          - { extra: snowflake, dependency: snowflake-connector-python, floor: "3.10.0", dependency-version: latest }
           - { extra: graphql-core, dependency: graphql-core, floor: "3.2.0", dependency-version: floor }
           - { extra: graphql-core, dependency: graphql-core, floor: "3.2.0", dependency-version: latest }
           - { extra: tenacity, dependency: tenacity, floor: "8.0.0", dependency-version: floor }
@@ -433,14 +461,34 @@ jobs:
           - { extra: honeybadger, dependency: honeybadger, floor: "0.15.0", dependency-version: latest }
           - { extra: psycopg, dependency: psycopg, floor: "3.1.0", dependency-version: floor }
           - { extra: psycopg, dependency: psycopg, floor: "3.1.0", dependency-version: latest }
-          - { extra: cassandra, dependency: cassandra-driver, floor: "3.25.0", dependency-version: floor }
-          - { extra: cassandra, dependency: cassandra-driver, floor: "3.25.0", dependency-version: latest }
+          # cassandra-driver==3.25.0 (the original aspirational floor):
+          # fails to build on Python 3.13 -- its ancient ez_setup.py
+          # bootstrap script calls TarFile.chown() without the
+          # numeric_owner argument, which became required in a later
+          # Python. Every version through 3.29.0 has this same bug (it's
+          # in the package's own decades-old setup tooling, not something
+          # that improved incrementally); only fixed in the latest line.
+          # First working version, confirmed on real Linux: 3.30.0.
+          - { extra: cassandra, dependency: cassandra-driver, floor: "3.30.0", dependency-version: floor }
+          - { extra: cassandra, dependency: cassandra-driver, floor: "3.30.0", dependency-version: latest }
           - { extra: influxdb, dependency: influxdb-client, floor: "1.30.0", dependency-version: floor }
           - { extra: influxdb, dependency: influxdb-client, floor: "1.30.0", dependency-version: latest }
-          - { extra: pyzmq, dependency: pyzmq, floor: "24.0.0", dependency-version: floor }
-          - { extra: pyzmq, dependency: pyzmq, floor: "24.0.0", dependency-version: latest }
-          - { extra: zeep, dependency: zeep, floor: "4.1.0", dependency-version: floor }
-          - { extra: zeep, dependency: zeep, floor: "4.1.0", dependency-version: latest }
+          # pyzmq==24.0.0 (the original aspirational floor): no cp313 wheel,
+          # and building from source fails with a real C++ compile error
+          # (a libzmq/C++ standard-library incompatibility) -- confirmed on
+          # real Linux, not just a Windows build-tooling gap. Every version
+          # through 26.0.3 has the same gap. First version with a cp313
+          # wheel, confirmed on real Linux: 26.1.0.
+          - { extra: pyzmq, dependency: pyzmq, floor: "26.1.0", dependency-version: floor }
+          - { extra: pyzmq, dependency: pyzmq, floor: "26.1.0", dependency-version: latest }
+          # zeep==4.1.0 (the original aspirational floor): zeep's own
+          # utils.py imports the stdlib cgi module directly, removed in
+          # Python 3.13 (PEP 594, same category as azure-core's floor bug
+          # above). Still broken at 4.2.0 and 4.2.1 -- zeep's own code, not
+          # a transitive dependency, so the fix had to land in zeep itself.
+          # First working version, confirmed on real Linux: 4.3.0.
+          - { extra: zeep, dependency: zeep, floor: "4.3.0", dependency-version: floor }
+          - { extra: zeep, dependency: zeep, floor: "4.3.0", dependency-version: latest }
           - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15.0", dependency-version: floor }
           - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15.0", dependency-version: latest }
           - { extra: bugsnag, dependency: bugsnag, floor: "4.5.0", dependency-version: floor }

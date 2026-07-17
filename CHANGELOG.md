@@ -13,8 +13,64 @@ the plugin unification), not from memory of what was released when.
 
 ## [0.2.1] - elasticsearch, batch-1 plugin growth, plain-English explanations, ExceptionGroup support
 
-Nine units of work since 0.2.0, newest first. 369 tests pass total;
+Ten units of work since 0.2.0, newest first. 369 tests pass total;
 `mypy --strict` clean.
+
+### Real CI confirmed 8 of the 46 batch 5-6 floor guesses were wrong -- fixed on real Linux
+
+The first real CI run after the batch 5-6 push (60/60), same discipline
+as every prior floor-correction round: never guess a fix from reading
+version numbers, always confirm on real Linux (WSL2 + `uv`) before
+writing it down. `pyproject.toml`'s aspirational floors are left as-is
+by convention; only `ci.yml`'s CI-tested floor moves:
+
+- **`cassandra-driver`**: `3.25.0` -> `3.30.0`. A bug in the package's
+  own decades-old `ez_setup.py` bootstrap script (`TarFile.chown()`
+  called without the now-required `numeric_owner` argument), present
+  in every version through 3.29.0 -- only fixed in the latest line.
+- **`clickhouse-connect`**: `0.6.0` -> `1.3.0`, the largest jump of this
+  round and the only one requiring two separate real-CI-driven fixes:
+  `pkg_resources` removal broke import below 0.7.0, but 0.7.0 through
+  1.2.0 still failed this plugin's *actual contract test* --
+  `ClickHouseError`'s `code=`/`name=` keyword constructor (the entire
+  reason this plugin exists) doesn't exist until 1.3.0. Found by
+  installing each candidate and running the real test against it, not
+  by checking "does it import."
+- **`confluent-kafka`**: `2.0.0` -> `2.6.0`. `2.0.0` was never
+  published at all (PyPI jumps `1.9.2` -> `2.0.2` directly) -- a bad
+  guess, not a version-compatibility gap. `2.0.2` through `2.5.0` fail
+  to build from source needing the system `librdkafka` C library;
+  `2.6.0` is the first version with a self-contained prebuilt wheel.
+- **`pymssql`**: `2.2.0` -> `2.3.1`. No `cp313` wheel through every
+  `2.2.x` patch and even `2.3.0`; first Python-3.13-compatible wheel at
+  `2.3.1`.
+- **`pyzmq`**: `24.0.0` -> `26.1.0`. No `cp313` wheel, and the source
+  build fails with a real C++ compile error through `26.0.3`.
+- **`snowflake-connector-python`**: `3.0.0` -> `3.10.0`. Same
+  `pkg_resources` removal as `clickhouse-connect`; still broken at
+  `3.5.0`, first working at `3.10.0`.
+- **`zeep`**: `4.1.0` -> `4.3.0`. Zeep's own `utils.py` imports the
+  stdlib `cgi` module directly (PEP 594 removal, same category as
+  `azure-core`'s earlier floor fix) -- still broken at `4.2.0`/`4.2.1`,
+  the fix had to land in zeep's own code.
+
+**One false alarm, not a floor bug:** `google-genai`'s floor
+(`1.0.0`) was correct -- the plugin's own field-reading logic
+(`.code`/`.status`/`.message`/`.details`) works fine at that version.
+The *test* was wrong: it constructed `ClientError` by passing a raw
+dict directly, which only happens to work against the newest SDK
+version's more lenient constructor. `1.0.0`'s real constructor expects
+a genuine `requests.Response` (or a `ReplayResponse`), so the test now
+builds one via `requests.models.Response()` and drives it through the
+SDK's own `raise_for_response()` classmethod -- the same construction
+path production code actually uses, matching this project's "real
+object" testing discipline instead of a shortcut that only coincidentally
+worked.
+
+**Two confirmed already correct, no change:** `pika`/`kubernetes`'s
+guessed floors (batch 2b) and `oracledb==2.0.0` (batch 6) all passed
+their real Linux floor check on the first try -- not everything from a
+guess turns out wrong.
 
 ### 7 new integrations (batch 6 of the 30-to-60 push, target reached): psycopg, cassandra, influxdb, pyzmq, zeep, elastic-apm, bugsnag
 

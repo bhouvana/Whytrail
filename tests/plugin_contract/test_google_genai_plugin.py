@@ -1,12 +1,20 @@
 """Validates the google_genai integration against a real
-google.genai.errors.APIError, constructed the same way the SDK builds
-one internally from a parsed API error response."""
+google.genai.errors.APIError, constructed via the SDK's own
+raise_for_response() classmethod from a real requests.Response --
+not a hand-built dict. That shortcut passed on the latest SDK version
+(where ClientError's constructor happens to accept a plain dict) but
+failed against the floor version's real constructor, which expects
+either a real requests.Response or a ReplayResponse with
+.body_segments -- found by real CI, confirmed on real Linux."""
 
 from __future__ import annotations
+
+import json
 
 import pytest
 
 genai_errors = pytest.importorskip("google.genai.errors")
+requests = pytest.importorskip("requests")
 pytest.importorskip("whytrail.integrations.google_genai")
 
 import whytrail  # noqa: E402
@@ -15,14 +23,23 @@ from whytrail import registry  # noqa: E402
 SECRET_MESSAGE = "invalid model_secret_key_xyz"
 
 
+def _api_error(status: int, message: str) -> "genai_errors.APIError":
+    response = requests.models.Response()
+    response.status_code = status
+    response._content = json.dumps({"error": {"code": status, "message": message, "status": "INVALID_ARGUMENT"}}).encode()
+    try:
+        genai_errors.APIError.raise_for_response(response)
+    except genai_errors.APIError as exc:
+        return exc
+    raise AssertionError("expected raise_for_response to raise")
+
+
 def test_plugin_is_discovered():
     assert registry.resolve_explainer(genai_errors.APIError) is not None
 
 
 def test_why_on_client_error_shows_code_and_status():
-    exc = genai_errors.ClientError(
-        400, {"error": {"code": 400, "message": "bad request", "status": "INVALID_ARGUMENT"}}
-    )
+    exc = _api_error(400, "bad request")
     explanation = whytrail.why(exc)
     assert explanation.known
     assert "400" in explanation.text
@@ -30,9 +47,7 @@ def test_why_on_client_error_shows_code_and_status():
 
 
 def test_message_is_in_locals_and_strippable_via_redacted():
-    exc = genai_errors.ClientError(
-        400, {"error": {"code": 400, "message": SECRET_MESSAGE, "status": "INVALID_ARGUMENT"}}
-    )
+    exc = _api_error(400, SECRET_MESSAGE)
     explanation = whytrail.why(exc)
     message_step = next(s for s in explanation.steps if s.locals)
     assert SECRET_MESSAGE in message_step.locals["message"]
@@ -45,6 +60,6 @@ def test_message_is_in_locals_and_strippable_via_redacted():
 
 def test_manual_registration_still_overrides_the_plugin():
     whytrail.register(genai_errors.APIError, lambda exc: "overridden by the user")
-    exc = genai_errors.ClientError(400, {"error": {"code": 400, "message": "x", "status": "INVALID_ARGUMENT"}})
+    exc = _api_error(400, "x")
     explanation = whytrail.why(exc)
     assert "overridden by the user" in explanation.text
