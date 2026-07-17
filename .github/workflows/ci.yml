@@ -77,6 +77,9 @@ jobs:
           - alembic
           - paramiko
           - elasticsearch
+          - pika
+          - kubernetes
+          - azure-core
     steps:
       - uses: actions/checkout@v4
 
@@ -319,6 +322,12 @@ jobs:
           - { extra: paramiko, dependency: paramiko, floor: "2.10.0", dependency-version: latest }
           - { extra: elasticsearch, dependency: elasticsearch, floor: "8.0.0", dependency-version: floor }
           - { extra: elasticsearch, dependency: elasticsearch, floor: "8.0.0", dependency-version: latest }
+          - { extra: pika, dependency: pika, floor: "1.1.0", dependency-version: floor }
+          - { extra: pika, dependency: pika, floor: "1.1.0", dependency-version: latest }
+          - { extra: kubernetes, dependency: kubernetes, floor: "18.20.0", dependency-version: floor }
+          - { extra: kubernetes, dependency: kubernetes, floor: "18.20.0", dependency-version: latest }
+          - { extra: azure-core, dependency: azure-core, floor: "1.24.0", dependency-version: floor }
+          - { extra: azure-core, dependency: azure-core, floor: "1.24.0", dependency-version: latest }
     steps:
       - uses: actions/checkout@v4
 

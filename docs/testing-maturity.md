@@ -1,7 +1,8 @@
 # Testing maturity: what's verified, what isn't
 
-This project has 237 tests across core whytrail and 30 plugin
-distributions. Every plugin's tests run against a real object from the
+This project has 281 tests across core whytrail and 37 bundled
+integrations (ADR 0006 -- extras of the one `whytrail` package, not
+separate distributions). Every plugin's tests run against a real object from the
 real library rather than a mock, a representative sample of the
 redaction-critical ones are now property-tested rather than
 spot-checked, and the safety-critical web middleware is verified under
@@ -47,7 +48,7 @@ the other.
   (`tests/plugin_contract/test_web_concurrency.py`).
 - **A plugin's stated minimum dependency version is confirmed to
   actually install and pass its tests on the newest supported Python**,
-  now for all 30 plugins -- not assumed from the version number in
+  now for all 37 plugins -- not assumed from the version number in
   `pyproject.toml`. This is what found the twenty version-compatibility
   bugs below, twelve locally and eight only once real CI ran.
 - **Precedence contracts hold**: a user's manual `whytrail.register()`
@@ -146,7 +147,7 @@ the other.
 ## What still isn't verified
 
 1. **Version compatibility beyond Python 3.13.** The version-matrix job
-   now covers all 30 plugins, but only against Python 3.13 -- 3.10/3.11/
+   now covers all 37 plugins, but only against Python 3.13 -- 3.10/3.11/
    3.12 floors are asserted in `pyproject.toml` but never installed and
    checked the way 3.13's were, and the twenty bugs just found on 3.13
    alone suggest that gap isn't hypothetical either.
@@ -182,7 +183,7 @@ the other.
    meaning the code path real production deployments actually use (the
    default `Worker`, Celery's prefork pool) has still never run at all,
    on any OS, in this repository.
-6. **Plugin-to-plugin interaction.** All 30 plugins have never been
+6. **Plugin-to-plugin interaction.** All 37 plugins have never been
    installed and exercised together in one process against the full
    registry resolution order at once.
 

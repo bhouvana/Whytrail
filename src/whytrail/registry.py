@@ -74,6 +74,9 @@ _BUILTIN_EXPLAINERS = (
     "alembic",
     "paramiko",
     "elasticsearch",
+    "pika",
+    "kubernetes",
+    "azure_core",
 )
 
 

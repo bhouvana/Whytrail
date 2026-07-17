@@ -107,6 +107,13 @@ Add a `mylib = ["mylib>=X.Y"]` extra to `pyproject.toml` so
 `pip install whytrail[mylib]` actually installs the library being
 explained.
 
+**Before opening the PR, update every place that states the aggregate
+count**, not just the code: this table below, README.md's ecosystem
+count and extras grid, and `docs/testing-maturity.md`'s opening
+paragraph and version-matrix coverage claims. Skipping this is exactly
+how the count drifted a full batch behind reality before it was caught
+retroactively while cutting 0.2.1 -- see `CHANGELOG.md`.
+
 ### External (your own separate package)
 
 Add an entry point in your plugin's `pyproject.toml`:
@@ -238,7 +245,7 @@ a security-relevant integration needs to clear.
 
 ## The integrations that exist today
 
-34, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
+37, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
 batch-by-batch progress). Each earns its place by clearing one of the
 three bars in ADR 0003, verified against real objects, not assumed from
 documentation -- several of these (marked *) were corrected after their
@@ -271,6 +278,9 @@ carry no structured data beyond what tier 1 already shows for free.
 | [`alembic`](../src/whytrail/integrations/alembic.py) | explainer | `ResolutionError`/`MultipleHeads` -- the actual bad revision id / ambiguous heads |
 | [`paramiko`](../src/whytrail/integrations/paramiko.py) | explainer | `BadHostKeyException` as key fingerprints, never raw key material |
 | [`elasticsearch`](../src/whytrail/integrations/elasticsearch.py) | explainer | `ApiError` HTTP status + redacted response body (`.body`'s `reason` can echo a raw query) |
+| [`pika`](../src/whytrail/integrations/pika.py) | explainer | `ChannelClosed`/`ConnectionClosed` AMQP `reply_code` + redacted `reply_text` |
+| [`kubernetes`](../src/whytrail/integrations/kubernetes.py) | explainer | `ApiException` HTTP status/reason + redacted response body |
+| [`azure-core`](../src/whytrail/integrations/azure_core.py) | explainer | `HttpResponseError` status/error code + redacted message (shared base of every Azure SDK client) |
 | [`sentry`](../src/whytrail/integrations/sentry.py) | integration | Attaches explanations to Sentry events via `before_send` |
 | [`otel`](../src/whytrail/otel.py) (core module, always bundled) | integration | Attaches explanations to the current OpenTelemetry span |
 | [`ddtrace`](../src/whytrail/integrations/ddtrace.py) | integration | Same, for Datadog spans |
@@ -305,7 +315,12 @@ new); **`PyJWT` and `cryptography`** (checked directly, same reasoning as
 `redis-py`: their exceptions carry no structured fields beyond the
 message -- real value captured instead as gloss/fix-table entries for
 `.plain_text`, not a full plugin that would add code without adding
-information). See `docs/adr/0003-ecosystem-scale-triage.md` for the full
+information); **`kafka-python`** (checked directly against a live Kafka
+container: `errno`/`message`/`description` on its error classes are
+class-level constants from a static protocol-error-code table, not
+populated per-instance, and there's no topic/partition/offset attribute
+on the exception itself -- same "nothing to add over tier 1" verdict as
+`redis-py`). See `docs/adr/0003-ecosystem-scale-triage.md` for the full
 reasoning and the much larger list of libraries that don't need a plugin
 at all.
 

@@ -3,7 +3,72 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased] - 1 new integration (batch 2 of the 30-to-60 push): elasticsearch
+**Note on the `[0.2.0]` heading below:** every entry between the initial
+0.1.0 release and the "unified all 30 plugins into extras" commit was
+originally filed under `[Unreleased]`, even after 0.2.0 actually shipped
+to PyPI -- the version bump was never paired with converting the
+changelog section. Reconstructed retroactively from `git log` (the
+commit that bumped `pyproject.toml`'s version is the same one that did
+the plugin unification), not from memory of what was released when.
+
+## [0.2.1] - elasticsearch, batch-1 plugin growth, plain-English explanations, ExceptionGroup support
+
+Five units of work since 0.2.0, newest first. 281 tests pass total;
+`mypy --strict` clean.
+
+### 3 new integrations (batch 2b of the 30-to-60 push): pika, kubernetes, azure-core
+
+Candidates researched by dispatching a background agent to actually
+install and exercise four libraries against real exceptions before
+writing any plugin code, per ADR 0003's bar -- one (`kafka-python`)
+was rejected on the same evidence, the other three confirmed:
+
+- **`pika`**: `ChannelClosed`/`ConnectionClosed`'s `reply_code`/
+  `reply_text` -- the broker's own AMQP status code and reply text
+  (e.g. `404, "NOT_FOUND - no exchange 'orders'"`). Both are
+  `@property`s reading `self.args`, not `__dict__` entries, so
+  `vars(exc)` alone would show nothing -- read via normal attribute
+  access instead. `ChannelClosed` and `ConnectionClosed` are siblings
+  under `AMQPError`, not one a subclass of the other, so both needed
+  their own registration despite sharing the exact same shape.
+  `reply_text` redacted (can echo a queue/exchange name from the
+  request); `reply_code` (a small closed AMQP status-code set) is
+  safe in `description`.
+- **`kubernetes`**: `ApiException`'s `.status`/`.reason`/`.body` --
+  note `.reason` is the *HTTP* reason phrase ("Not Found"), not the
+  Kubernetes `Status` object's own `reason` field ("NotFound"), which
+  only exists inside `.body`. Direct construction
+  (`ApiException(status=, reason=)`) leaves `.body` as `None`, so this
+  one specifically needed a real request/response round trip (a
+  throwaway local HTTP server, no live cluster) to get a real object
+  with `.body` actually populated -- confirmed by trying direct
+  construction first and finding it insufficient. `.body` redacted (a
+  cluster's error message routinely echoes back the resource name and
+  namespace from the request).
+- **`azure-core`**: `HttpResponseError`'s `.status_code`/`.reason`/
+  `.error` (a parsed `ODataV4Format` with its own `.code`/`.message`,
+  shared across every Azure SDK client built on azure-core --
+  azure-storage-blob, azure-identity, azure-cosmos, etc.). `.error.code`
+  is a stable taxonomy string (e.g. `"BlobNotFound"`), safe in
+  `description`; `.error.message`/`.message` redacted (routinely
+  echoes a request ID or resource path).
+
+**Rejected, with reasons:** `kafka-python` (the `-ng` fork is
+superseded -- `kafka-python` itself resumed releases and is now the
+one to target, confirmed via PyPI, not assumed) was checked directly
+against a live Kafka container and found to carry no per-instance data
+on its exceptions at all: `errno`/`message`/`description` are
+class-level constants from a static protocol-error-code table, not
+populated per-exception, and there's no topic/partition/offset
+attribute on the exception itself (only on success objects). Same
+"nothing to add over tier 1" verdict as `redis-py`.
+
+pyproject.toml gained `pika`/`kubernetes`/`azure-core` extras (floors
+`pika>=1.1`, `kubernetes>=18.20`, `azure-core>=1.24` -- all guesses
+from the research, not yet bisected against real CI the way the
+batch-1 floors were).
+
+### 1 new integration (batch 2 of the 30-to-60 push): elasticsearch
 
 `elasticsearch.ApiError` (covering `NotFoundError`, `ConflictError`,
 `AuthorizationException`, etc.) carries the HTTP status via `.meta.status`
@@ -27,7 +92,7 @@ pyproject.toml gained an `elasticsearch` extra (floor `elasticsearch>=8.0`).
 against `elasticsearch==8.0.0` before push; treated as a guess until
 real CI confirms it, same discipline as every prior floor.
 
-## [Unreleased] - 3 new integrations (batch 1 of the 30-to-60 push): stripe, alembic, paramiko
+### 3 new integrations (batch 1 of the 30-to-60 push): stripe, alembic, paramiko
 
 First batch of growing the integration count, each checked against
 ADR 0003's actual bar (structured error data a bare traceback throws
@@ -90,7 +155,7 @@ this project has been handled):
   never installs it. A packaging bug in paramiko itself. First working,
   by bisection: `2.10.0`.
 
-## [Unreleased] - fixed: why() was blind to ExceptionGroup's sub-exceptions
+### Fixed: why() was blind to ExceptionGroup's sub-exceptions
 
 Found by actually raising one, not by reasoning about the type in the
 abstract: `why()` on a Python 3.11+ `ExceptionGroup` (what
@@ -113,7 +178,7 @@ catching one of these needs.
   correctly pre-3.11, not just that the guard *looks* right.
 - 251 tests pass total; `mypy --strict` clean.
 
-## [Unreleased] - plain-English explanations and fix suggestions
+### Plain-English explanations and fix suggestions
 
 - **`Explanation.plain_text`**: a prose rendering of the exact same
   steps `.text` shows, phrased for someone without a programming
@@ -138,7 +203,13 @@ catching one of these needs.
   types, non-exception steps left alone, confidence hedging, redaction
   interaction). 248 tests pass total; `mypy --strict` clean.
 
-## [Unreleased] - unified all 30 plugins into extras of one package (ADR 0006)
+## [0.2.0] - unified plugin ecosystem into extras, renamed to whytrail, first real CI hardening
+
+Nine units of work, newest first. Published to PyPI as `whytrail` 0.2.0.
+This heading was missing until it was reconstructed retroactively from
+git history -- see the note at the top of this file.
+
+### Unified all 30 plugins into extras of one package (ADR 0006)
 
 A fresh-install smoke test of the real PyPI package (not the local
 build) confirmed core `whytrail` works end to end -- but also surfaced
@@ -183,7 +254,7 @@ unchanged. Full reasoning in
 - All 237 tests pass unchanged against the new layout; `mypy --strict`
   clean.
 
-## [Unreleased] - second CI run found eight more, real Linux this time
+### Second CI run found eight more, real Linux this time
 
 The three-bug fix above unblocked the `test` and `plugin-contract-tests`
 jobs and expanded `plugin-version-matrix` from 2 broken jobs to 103 real
@@ -241,7 +312,7 @@ Full technical detail and the "why" behind each floor choice is in
 `.github/workflows/ci.yml`'s `plugin-version-matrix` job comment, not
 duplicated here.
 
-## [Unreleased] - first real CI run found three bugs no local check could
+### First real CI run found three bugs no local check could
 
 Pushed to `github.com/bhouvana/Whytrail` for the first time. Every prior
 verification in this project ran in one local Windows sandbox; the first
@@ -288,7 +359,7 @@ confirm root cause before fixing:
   YAML/mypy/pytest check parses or could have caught. Fixed by making
   every one of the 60 combinations an explicit `include` entry.
 
-## [Unreleased] - VS Code extension scope assessment
+### VS Code extension scope assessment
 
 Added `docs/adr/0005-vscode-extension-scope.md`: scopes the VS Code
 extension idea flagged during the category-strategy review as the
@@ -303,7 +374,7 @@ library with zero published releases inverts the adoption funnel it's
 meant to serve. No code changed; the assessment exists so the idea has
 somewhere to land next time it comes up instead of restarting from zero.
 
-## [Unreleased] - mkdocs documentation site
+### mkdocs documentation site
 
 Added `mkdocs.yml` (Material theme, light/dark palette, Mermaid fence
 support for `Explanation.graph()` output) plus a GitHub Pages deploy
@@ -320,7 +391,7 @@ informational in `mkdocs.yml` rather than either failing the build or
 rewriting ~40 links to absolute GitHub blob URLs for a purely cosmetic
 gain).
 
-## [Unreleased] - renamed to whytrail; protocol freeze; version-matrix expanded to all 30 plugins
+### Renamed to whytrail; protocol freeze; version-matrix expanded to all 30 plugins
 
 - **Renamed `butwhy` to `whytrail`** across the entire repository (package,
   30 plugin distributions, entry-point group, docs, CI). Forced by a PyPI
@@ -373,7 +444,7 @@ gain).
   internal import). Full list and corrected floors in
   `docs/testing-maturity.md` and `.github/workflows/ci.yml`.
 
-## [Unreleased] - Phase 2: closing part of the testing-maturity gap
+### Phase 2: closing part of the testing-maturity gap
 
 Full detail in `docs/testing-maturity.md`, updated alongside this work
 rather than left describing an earlier state of the project.
@@ -414,7 +485,7 @@ rather than left describing an earlier state of the project.
   two new attributes CPython 3.13 added to every class. Neither gap
   was visible from the version numbers in `pyproject.toml` alone.
 
-## [Unreleased] - 21 more plugins (30 total), and an honest coverage note
+### 21 more plugins (30 total), and an honest coverage note
 
 Full reasoning in `docs/adr/0003-ecosystem-scale-triage.md`. Added:
 `whytrail-httpx`, `whytrail-aiohttp`, `whytrail-huggingface-hub`,
@@ -460,7 +531,7 @@ argument for writing them:**
   asserting nothing, caught because the assertions still failed instead
   of passing vacuously.
 
-## [Unreleased] - pre-1.0 API fixes from the category strategy review
+### Pre-1.0 API fixes from the category strategy review
 
 Applied before building further plugins on top of the public API, per
 `docs/adr/0002-category-strategy.md` §3's severity ranking (items that are
@@ -479,7 +550,7 @@ costly to change after other code depends on them):
   because they're the vocabulary of writing an explainer -- a mainstream
   activity documented in `docs/plugin-guide.md`, not an advanced one.
 
-### Core fix: locals moved to a dedicated, redactable field
+#### Core fix: locals moved to a dedicated, redactable field
 
 Found while wiring up `whytrail-sentry`: locals were embedded directly in
 `ExplanationStep.description` text, which meant any integration exporting
@@ -490,7 +561,7 @@ returns a copy with every step's locals cleared. `whytrail.otel.record()`
 and `whytrail_sentry.before_send()` both redact by default now, with an
 explicit `include_locals=True` opt-in. See ADR 0002 §3 item 5.
 
-### Nine ecosystem integrations, plus a generator and a triage for the next ~150
+#### Nine ecosystem integrations, plus a generator and a triage for the next ~150
 
 Documented in `docs/adr/0002-category-strategy.md` (tiering) and
 `docs/adr/0003-ecosystem-scale-triage.md` (the "how far does this scale"

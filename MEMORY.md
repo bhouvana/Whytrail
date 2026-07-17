@@ -26,8 +26,12 @@ an honest "unknown" answer, not a guess.
   `pypa/gh-action-pypi-publish`, no stored token) -- 0.1.0 and 0.2.0
   both shipped
 - Docs site: https://bhouvana.github.io/Whytrail/ (GitHub Pages)
-- Current version in `pyproject.toml`: **0.2.0** (unreleased changes on
-  top, not yet cut as 0.2.1)
+- Current version in `pyproject.toml`: **0.2.1** (bumped from 0.2.0
+  mid-session by the same background documentation-consistency process
+  noted below; `CHANGELOG.md`'s `[0.2.1]` heading consolidates
+  everything since 0.2.0 -- plain_text/fix-suggestions, ExceptionGroup,
+  and every plugin batch so far. Not yet actually published to PyPI as
+  of this writing -- check PyPI before assuming it's live.)
 
 ## What's been achieved, in order
 
@@ -97,6 +101,57 @@ an honest "unknown" answer, not a guess.
      actual discovery list) -- silently broken until
      `test_plugin_is_discovered()` caught it. **This is the single most
      important gotcha for adding any new plugin** -- see below.
+8. **Batch 2 shipped: `elasticsearch`** (33 -> 34). `ApiError`/
+   `NotFoundError`'s `.meta.status` + `.body`, verified via a real
+   request/response round trip against a throwaway local HTTP server
+   (no live Elasticsearch needed). `.body` fully redacted (an
+   `error.reason` can echo a raw query fragment verbatim). Commit
+   `b2db38c`; CI run `29580955949` completed with **conclusion:
+   success**.
+9. **Batch 2b shipped: `pika`, `kubernetes`, `azure-core`** (34 -> 37).
+   A background research agent (`Agent` tool, real installs + real
+   exceptions, not docs-reading) checked these plus `kafka-python`:
+   - **`pika`**: `ChannelClosed`/`ConnectionClosed`'s `reply_code`/
+     `reply_text` (AMQP broker reply). Both are `@property`s reading
+     `self.args`, not `__dict__` entries -- `vars(exc)` alone would
+     show nothing, use normal attribute access. The two classes are
+     siblings under `AMQPError`, not one a subclass of the other, so
+     both needed separate `register_from_plugin()` calls.
+   - **`kubernetes`**: `ApiException`'s `.status`/`.reason`/`.body`.
+     `.reason` is the *HTTP* reason phrase ("Not Found"), not the k8s
+     `Status` object's own `reason` field ("NotFound", inside `.body`).
+     Direct construction (`ApiException(status=, reason=)`) leaves
+     `.body` as `None` -- confirmed this directly before writing the
+     test, so the contract test uses a real local-HTTP-server round
+     trip instead, the only way to get `.body` actually populated.
+   - **`azure-core`**: `HttpResponseError`'s `.status_code`/`.reason`/
+     `.error` (parsed `ODataV4Format`, `.error.code`/`.error.message`)
+     -- shared base of every Azure SDK client (blob, identity, cosmos,
+     etc.), so one registration covers all of them.
+   - **`kafka-python` rejected**: checked directly against a live
+     Kafka container -- `errno`/`message`/`description` are
+     class-level constants from a static protocol-error-code table,
+     not per-instance data, and no topic/partition/offset attribute
+     exists on the exception itself. Same verdict as `redis-py`. Also
+     confirmed via PyPI: `kafka-python-ng` is superseded, `kafka-python`
+     itself resumed releases (now 3.0.8) -- target that name, not the
+     fork.
+   All three new floors are still **guesses** (`pika>=1.1`,
+   `kubernetes>=18.20`, `azure-core>=1.24`), not yet bisected against
+   real CI the way batch 1's were -- **do this next**.
+   All 3 new integrations' tests passed on the first try locally (13
+   new tests, 281 total; `mypy --strict` clean) -- no repeat of the
+   `_BUILTIN_EXPLAINERS`-omission bug this time, the checklist below
+   was followed exactly.
+10. A background documentation-consistency process has been actively
+    touching this repo in parallel throughout the session (`ci.yml`,
+    `pyproject.toml`, `CHANGELOG.md`, `docs/plugin-guide.md` have all
+    been edited by something other than direct action in this
+    conversation -- treat concurrent file changes as intentional and
+    build on them, don't revert). It bumped `pyproject.toml` to
+    `0.2.1` and consolidated `CHANGELOG.md` under a `[0.2.1]` heading.
+    **A new session should run `git status`/`git diff` before assuming
+    any file is in the state this memory file describes.**
 
 ## Established conventions (do not relitigate these)
 
@@ -154,21 +209,18 @@ an honest "unknown" answer, not a guess.
 
 ## Current numbers
 
-- 34 bundled integrations (22 explainer-shaped, auto-registered; 12
+- 37 bundled integrations (25 explainer-shaped, auto-registered; 12
   integration-shaped, need explicit user wiring).
-- 268 tests passing, `mypy --strict` clean.
-- Target: 60 integrations total (34 done, ~26 to go).
+- 281 tests passing, `mypy --strict` clean.
+- Target: 60 integrations total (37 done, ~23 to go).
 
 ## Pending / next steps
 
-1. **Batch 2 plugins toward 60** (in progress): `elasticsearch` is
-   **done** -- `elasticsearch.ApiError`/`NotFoundError`, verified via a
-   real request/response round trip against a throwaway local HTTP
-   server (`.meta.status` + `.body`, `.body` fully redacted since
-   `error.reason` can echo a raw query fragment). Still need the same
-   real-object-inspection research for: `pika`, `kafka-python`,
-   `kubernetes`, `azure-core` -- a background research agent was
-   dispatched for these four; check its findings before writing code.
+1. **Verify batch 2b's floors on real CI**: `pika>=1.1`,
+   `kubernetes>=18.20`, `azure-core>=1.24` are all unbisected guesses.
+   Push, wait for CI, expect ~1 real floor bug per new plugin (100% hit
+   rate so far across 3 rounds), fix via the WSL2+`uv` real-Linux
+   bisection method, same as every prior floor correction.
 2. **Batch 3 candidates** (unresearched): `falcon`, `lxml`, `protobuf`,
    `authlib`, `tomllib`.
 3. **Batch 4 candidates** (unresearched): Django ORM enhancement,
