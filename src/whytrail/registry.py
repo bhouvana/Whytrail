@@ -77,6 +77,10 @@ _BUILTIN_EXPLAINERS = (
     "pika",
     "kubernetes",
     "azure_core",
+    "sendgrid",
+    "websockets",
+    "opensearch",
+    "pyodbc",
 )
 
 

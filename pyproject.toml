@@ -60,6 +60,10 @@ elasticsearch = ["elasticsearch>=8.0"]
 pika = ["pika>=1.1"]
 kubernetes = ["kubernetes>=18.20"]
 azure-core = ["azure-core>=1.24"]
+sendgrid = ["sendgrid>=6.0"]
+websockets = ["websockets>=12.0"]
+opensearch = ["opensearch-py>=2.0"]
+pyodbc = ["pyodbc>=4.0"]
 
 # Integration-shaped (hook/middleware/signal-based, ADR 0006): the extra
 # only pulls in the dependency -- nothing auto-registers, since these
@@ -82,7 +86,7 @@ langchain = ["langchain-core>=0.2"]
 # CI matrices -- not meant as a typical user's default (see ADR 0006 for
 # why each stays its own extra instead of always installing everything).
 all = [
-    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain]",
+    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sendgrid,websockets,opensearch,pyodbc,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain]",
 ]
 
 dev = [

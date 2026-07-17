@@ -13,8 +13,63 @@ the plugin unification), not from memory of what was released when.
 
 ## [0.2.1] - elasticsearch, batch-1 plugin growth, plain-English explanations, ExceptionGroup support
 
-Five units of work since 0.2.0, newest first. 281 tests pass total;
+Six units of work since 0.2.0, newest first. 297 tests pass total;
 `mypy --strict` clean.
+
+### 4 new integrations (batch 3 of the 30-to-60 push): sendgrid, websockets, opensearch, pyodbc
+
+Checked directly against real objects, not docs, per ADR 0003's bar.
+`tomllib` was also researched this batch and rejected (see below).
+
+- **`sendgrid`**: `python_http_client.exceptions.HTTPError` (the base
+  SendGrid's SDK actually raises -- `BadRequestsError`,
+  `UnauthorizedError`, etc.) carries `.status_code`/`.reason`/`.body`/
+  `.headers`, confirmed by direct construction the same way the SDK
+  builds one internally. `.body` redacted (echoes back the offending
+  field/value); `.status_code`/`.reason` are safe in `description`.
+- **`websockets`**: `ConnectionClosed`'s close code/reason -- but
+  reads `.rcvd.code`/`.rcvd.reason`, not the `exc.code`/`exc.reason`
+  properties, which turned out to be **deprecated since websockets
+  13.1** (found by constructing a real `ConnectionClosedError` and
+  watching a live `DeprecationWarning` fire, not by reading a
+  changelog). Falls back to the deprecated accessors only when
+  `.rcvd` is `None` (the peer never sent a close frame at all -- still
+  produces a sensible default, confirmed directly: code 1006, empty
+  reason). `.reason` redacted (echoes back the specific error that
+  caused the disconnect); `.code` (a small closed RFC 6455 set) is
+  safe in `description`.
+- **`opensearch`**: `opensearchpy.exceptions.TransportError`'s
+  `.status_code`/`.error`/`.info` -- opensearch-py is a fork of
+  elasticsearch-py and shares the exact same shape as the existing
+  `whytrail-elasticsearch` plugin (same `vars(exc)`-is-empty gotcha,
+  confirmed directly rather than assumed from the fork relationship).
+  `.info` (the full structured response) redacted; `.status_code`/
+  `.error` safe in `description`.
+- **`pyodbc`**: `pyodbc.Error`'s `args[0]`/`args[1]` -- a real
+  ISO/ODBC SQLSTATE taxonomy code and the driver's own message,
+  confirmed directly (`vars(exc)` is empty; pyodbc exposes no named
+  attributes, only `.args`, unlike psycopg2's blocked C-level
+  attributes noted in ADR 0003 -- a different constraint, checked
+  separately rather than assumed to be the same problem). SQLSTATE
+  safe in `description`; driver message redacted (routinely embeds
+  the offending table/column name).
+
+**`tomllib` rejected, with reasons:** fed seven kinds of malformed TOML
+into `tomllib.loads()` and inspected the real `TOMLDecodeError` --
+`vars(exc)` is empty and there is no `.lineno`/`.colno`/`.pos`
+attribute analogous to PyYAML's `MarkedYAMLError.problem_mark`; the
+"at line X, column Y" text is baked directly into the single message
+string at raise time, not exposed separately. This is the
+`configparser` shape (plain message), not the PyYAML shape (a
+structured, independently-redactable `Mark` object) -- checked
+directly rather than assumed from either precedent. Also confirmed no
+redaction concern exists either: a secret value planted in malformed
+TOML never appeared in `str(exc)` in any of the seven cases tested.
+
+pyproject.toml gained `sendgrid`/`websockets`/`opensearch`/`pyodbc`
+extras (floors `sendgrid>=6.0`, `websockets>=12.0`,
+`opensearch-py>=2.0`, `pyodbc>=4.0` -- all guesses, not yet bisected
+against real CI).
 
 ### 3 new integrations (batch 2b of the 30-to-60 push): pika, kubernetes, azure-core
 

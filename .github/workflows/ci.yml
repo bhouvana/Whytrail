@@ -80,6 +80,10 @@ jobs:
           - pika
           - kubernetes
           - azure-core
+          - sendgrid
+          - websockets
+          - opensearch
+          - pyodbc
     steps:
       - uses: actions/checkout@v4
 
@@ -328,6 +332,14 @@ jobs:
           - { extra: kubernetes, dependency: kubernetes, floor: "18.20.0", dependency-version: latest }
           - { extra: azure-core, dependency: azure-core, floor: "1.24.0", dependency-version: floor }
           - { extra: azure-core, dependency: azure-core, floor: "1.24.0", dependency-version: latest }
+          - { extra: sendgrid, dependency: sendgrid, floor: "6.0.0", dependency-version: floor }
+          - { extra: sendgrid, dependency: sendgrid, floor: "6.0.0", dependency-version: latest }
+          - { extra: websockets, dependency: websockets, floor: "12.0", dependency-version: floor }
+          - { extra: websockets, dependency: websockets, floor: "12.0", dependency-version: latest }
+          - { extra: opensearch, dependency: opensearch-py, floor: "2.0.0", dependency-version: floor }
+          - { extra: opensearch, dependency: opensearch-py, floor: "2.0.0", dependency-version: latest }
+          - { extra: pyodbc, dependency: pyodbc, floor: "4.0.0", dependency-version: floor }
+          - { extra: pyodbc, dependency: pyodbc, floor: "4.0.0", dependency-version: latest }
     steps:
       - uses: actions/checkout@v4
 

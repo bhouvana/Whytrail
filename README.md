@@ -90,7 +90,7 @@ are extras of this same package, not new verbs -- see
 
 ## Ecosystem
 
-37 integrations today and growing, each earning its place by clearing
+41 integrations today and growing, each earning its place by clearing
 one of three bars (structured error data, a security-sensitive
 boundary, or a non-standard capture mechanism) rather than existing
 just to exist -- see `docs/adr/0003-ecosystem-scale-triage.md` for the
@@ -111,11 +111,12 @@ adds: `docs/plugin-guide.md`.
 | `whytrail[pyyaml]` | `whytrail[pandas]` | `whytrail[polars]` |
 | `whytrail[stripe]` | `whytrail[alembic]` | `whytrail[paramiko]` |
 | `whytrail[elasticsearch]` | `whytrail[pika]` | `whytrail[kubernetes]` |
-| `whytrail[azure-core]` | `whytrail[sentry]` | `whytrail[ddtrace]` |
-| `whytrail[celery]` | `whytrail[rq]` | `whytrail[dramatiq]` |
-| `whytrail[prefect]` | `whytrail[scrapy]` | `whytrail[pytest]` |
-| `whytrail[fastapi]` | `whytrail[django]` | `whytrail[flask]` |
-| `whytrail[langchain]` |
+| `whytrail[azure-core]` | `whytrail[sendgrid]` | `whytrail[websockets]` |
+| `whytrail[opensearch]` | `whytrail[pyodbc]` | `whytrail[sentry]` |
+| `whytrail[ddtrace]` | `whytrail[celery]` | `whytrail[rq]` |
+| `whytrail[dramatiq]` | `whytrail[prefect]` | `whytrail[scrapy]` |
+| `whytrail[pytest]` | `whytrail[fastapi]` | `whytrail[django]` |
+| `whytrail[flask]` | `whytrail[langchain]` |
 
 All of the above in one install: `pip install whytrail[all]`. Want to publish your
 own, outside this repo, for a library not on this list?

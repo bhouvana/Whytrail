@@ -245,7 +245,7 @@ a security-relevant integration needs to clear.
 
 ## The integrations that exist today
 
-37, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
+41, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
 batch-by-batch progress). Each earns its place by clearing one of the
 three bars in ADR 0003, verified against real objects, not assumed from
 documentation -- several of these (marked *) were corrected after their
@@ -281,6 +281,10 @@ carry no structured data beyond what tier 1 already shows for free.
 | [`pika`](../src/whytrail/integrations/pika.py) | explainer | `ChannelClosed`/`ConnectionClosed` AMQP `reply_code` + redacted `reply_text` |
 | [`kubernetes`](../src/whytrail/integrations/kubernetes.py) | explainer | `ApiException` HTTP status/reason + redacted response body |
 | [`azure-core`](../src/whytrail/integrations/azure_core.py) | explainer | `HttpResponseError` status/error code + redacted message (shared base of every Azure SDK client) |
+| [`sendgrid`](../src/whytrail/integrations/sendgrid.py) | explainer | `HTTPError` (python_http_client) status/reason + redacted response body |
+| [`websockets`](../src/whytrail/integrations/websockets.py) | explainer | `ConnectionClosed` close code + redacted close reason |
+| [`opensearch`](../src/whytrail/integrations/opensearch.py) | explainer | `TransportError` status/error + redacted response info (elasticsearch-py fork, same shape) |
+| [`pyodbc`](../src/whytrail/integrations/pyodbc.py) | explainer | `Error` SQLSTATE code + redacted driver message |
 | [`sentry`](../src/whytrail/integrations/sentry.py) | integration | Attaches explanations to Sentry events via `before_send` |
 | [`otel`](../src/whytrail/otel.py) (core module, always bundled) | integration | Attaches explanations to the current OpenTelemetry span |
 | [`ddtrace`](../src/whytrail/integrations/ddtrace.py) | integration | Same, for Datadog spans |
