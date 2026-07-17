@@ -143,15 +143,44 @@ an honest "unknown" answer, not a guess.
    new tests, 281 total; `mypy --strict` clean) -- no repeat of the
    `_BUILTIN_EXPLAINERS`-omission bug this time, the checklist below
    was followed exactly.
-10. A background documentation-consistency process has been actively
-    touching this repo in parallel throughout the session (`ci.yml`,
-    `pyproject.toml`, `CHANGELOG.md`, `docs/plugin-guide.md` have all
-    been edited by something other than direct action in this
-    conversation -- treat concurrent file changes as intentional and
-    build on them, don't revert). It bumped `pyproject.toml` to
-    `0.2.1` and consolidated `CHANGELOG.md` under a `[0.2.1]` heading.
-    **A new session should run `git status`/`git diff` before assuming
-    any file is in the state this memory file describes.**
+10. A background process has been actively and rapidly adding its own
+    plugin batches in parallel throughout the session, independent of
+    this conversation's own work (`ci.yml`, `pyproject.toml`,
+    `CHANGELOG.md`, `docs/plugin-guide.md`, `registry.py` have all
+    been edited by something other than direct action here -- treat
+    concurrent file changes as intentional and build on them, don't
+    revert). It bumped `pyproject.toml` to `0.2.1`, consolidated
+    `CHANGELOG.md` under a `[0.2.1]` heading, and independently shipped
+    its own "batch 3" (`sendgrid`, `websockets`, `opensearch`,
+    `pyodbc` -- different libraries than this conversation's originally
+    planned batch 3 of falcon/lxml/protobuf/authlib/tomllib, though it
+    also researched and rejected `tomllib` using the same discipline).
+    As of the last check it had also started an uncommitted, unverified
+    "batch 4" (`google-genai`, `oracledb`, `confluent-kafka` -- files
+    exist on disk but nothing is tested, committed, or wired into CI
+    yet). **A new session should run `git status`/`git diff` and check
+    the actual integration count in `pyproject.toml` before assuming
+    any file or count matches what this memory file describes -- it
+    moves fast.**
+11. **Fixed batch-2b's azure-core floor** (found already fixed,
+    identically, by the concurrent process when I went to push my own
+    bisection -- `azure-core==1.24.0` imports the stdlib `cgi` module,
+    removed in Python 3.13 (PEP 594); floor moved to `1.27.0`). `pika`
+    and `kubernetes`' guessed floors both passed real CI on the first
+    try -- no bug, breaking batch 1's 100% floor-bug-hit-rate streak.
+12. **Fixed the concurrent process's batch-3 floors**: `sendgrid==6.0.0`
+    imports PyYAML without declaring it as a dependency (floor moved to
+    `6.1.0`, same category as paramiko's missing `six`); `pyodbc==4.0.0`
+    has no Python 3.13 wheel anywhere in the 4.0.x/5.0.x/5.1.x line
+    (floor moved to `5.2.0`, the first version with a cp313 wheel --
+    confirmed the unixODBC *runtime* library itself is already present
+    on `ubuntu-latest`, since that job's `latest` entry already passed).
+    `websockets` and `opensearch`'s guessed floors both passed on the
+    first try. Commit `c3157f1`, pushed; CI run `29583375691` not yet
+    confirmed at time of writing -- **check that first in a new
+    session**, and if a "batch 4" (google-genai/oracledb/confluent-kafka)
+    has since been committed by the concurrent process, its floors will
+    need the same real-CI verification treatment once they land.
 
 ## Established conventions (do not relitigate these)
 
@@ -209,20 +238,28 @@ an honest "unknown" answer, not a guess.
 
 ## Current numbers
 
-- 37 bundled integrations (25 explainer-shaped, auto-registered; 12
-  integration-shaped, need explicit user wiring).
-- 281 tests passing, `mypy --strict` clean.
-- Target: 60 integrations total (37 done, ~23 to go).
+Moving fast and partly out of this conversation's direct control (see
+item 10 above) -- **verify against `pyproject.toml` directly, this
+will already be stale**. Last confirmed count: 41 bundled integrations
+(sendgrid/websockets/opensearch/pyodbc batch complete and floor-fixed;
+a further google-genai/oracledb/confluent-kafka batch exists on disk
+but is uncommitted and unverified as of the last check). 297+ tests.
 
 ## Pending / next steps
 
-1. **Verify batch 2b's floors on real CI**: `pika>=1.1`,
-   `kubernetes>=18.20`, `azure-core>=1.24` are all unbisected guesses.
-   Push, wait for CI, expect ~1 real floor bug per new plugin (100% hit
-   rate so far across 3 rounds), fix via the WSL2+`uv` real-Linux
-   bisection method, same as every prior floor correction.
-2. **Batch 3 candidates** (unresearched): `falcon`, `lxml`, `protobuf`,
-   `authlib`, `tomllib`.
+1. **Check whether the concurrent process's "batch 4"
+   (google-genai/oracledb/confluent-kafka) has been committed.** If so,
+   it needs the same treatment every prior batch got: confirm it
+   actually followed the checklist above (real-object verification,
+   `_BUILTIN_EXPLAINERS` registration, tests, CI wiring), run it
+   locally, push if not already pushed, and treat its floors as
+   guesses until real CI confirms them.
+2. **This conversation's originally planned batch 3** (unresearched,
+   still open, different from the concurrent process's own batch 3):
+   `falcon`, `lxml`, `protobuf`, `authlib`. (`tomllib` was already
+   researched and rejected by the concurrent process -- no per-instance
+   structured data on `TOMLDecodeError`, same verdict independently
+   reachable.)
 3. **Batch 4 candidates** (unresearched): Django ORM enhancement,
    `gql`, `cohere`, `twilio`, `sendgrid`.
 4. **Batch 5 candidates** (unresearched): `websockets`, `avro`,
