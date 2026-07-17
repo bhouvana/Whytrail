@@ -140,9 +140,10 @@ gaps).
 
 ## Status
 
-Pre-1.0. The public API may still change between minor versions. See
-`CHANGELOG.md` for what's shipped at each version and `docs/adr/` for the
-architecture this was built from:
+Pre-1.0. The public API may still change between minor versions -- see
+`docs/api-stability.md` for what's actually stable in practice versus
+still moving. See `CHANGELOG.md` for what's shipped at each version and
+`docs/adr/` for the architecture this was built from:
 
 - [`0001`](docs/adr/0001-whytrail-architecture.md) -- feasibility and the
   original two-tier architecture.
