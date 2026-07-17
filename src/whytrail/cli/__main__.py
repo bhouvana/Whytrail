@@ -13,6 +13,7 @@ import json
 import runpy
 import sys
 import typing as t
+from pathlib import Path
 
 import whytrail
 
@@ -42,6 +43,17 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run(args: argparse.Namespace) -> int:
+    # Checked explicitly rather than letting runpy.run_path() raise its
+    # own FileNotFoundError: that error's traceback frame is inside
+    # <frozen runpy>, so why() (correctly) renders runpy's own internal
+    # locals (a raw function repr, a memory address) instead of anything
+    # about the user's actual mistake -- accurate, but not a good first
+    # impression for the one command a brand-new user is most likely to
+    # run first.
+    if not Path(args.script).is_file():
+        print(f"whytrail: no such file: {args.script}", file=sys.stderr)
+        return 1
+
     old_argv = sys.argv
     sys.argv = [args.script, *args.script_args]
     try:

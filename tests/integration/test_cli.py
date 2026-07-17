@@ -46,6 +46,21 @@ def test_cli_run_json_flag_produces_valid_json(tmp_path, capsys):
     assert "boom from inner" in payload["steps"][0]["description"]
 
 
+def test_cli_run_missing_script_gives_a_clean_error_not_runpy_internals(tmp_path, capsys):
+    missing = tmp_path / "does_not_exist.py"
+    exit_code = main(["run", str(missing)])
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "no such file" in captured.err
+    assert str(missing) in captured.err
+    # The old behavior let runpy.run_path() raise, which why() then
+    # rendered honestly but unhelpfully -- a <frozen runpy> frame with
+    # the interpreter's own internal locals, not anything about the
+    # user's actual mistake.
+    assert "frozen runpy" not in captured.err
+    assert "read_code" not in captured.err
+
+
 def test_cli_run_clean_script_returns_zero(tmp_path, capsys):
     script = tmp_path / "clean.py"
     script.write_text("x = 1 + 1\n")
