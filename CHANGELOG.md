@@ -45,9 +45,26 @@ by the same discipline that's caught everything else this session:
   `test_plugin_is_discovered()` assertion failed loudly, which is
   exactly why that assertion exists in every plugin's test file.
 
-pyproject.toml gained `stripe`/`alembic`/`paramiko` extras (floors not
-yet verified against real CI the way the original 30's were -- that's
-still pending). 264 tests pass total; `mypy --strict` clean.
+pyproject.toml gained `stripe`/`alembic`/`paramiko` extras. 264 tests
+pass total; `mypy --strict` clean.
+
+**All three new floors turned out wrong once real CI checked them --
+the same ~1-bug-per-new-floor rate the original 30 hit, now 3 for 3**
+(`pyproject.toml`'s aspirational floors are left as-is; only the
+CI-tested floor moves, matching how every prior floor correction in
+this project has been handled):
+- `stripe==7.0.0`: `stripe.StripeError`/`stripe.CardError` didn't exist
+  as top-level names yet (only under the older `stripe.error.*` path).
+  First working: `8.0.0`.
+- `alembic==1.7.0`: `NameError: name 'TextClause' is not defined`,
+  raised inside alembic's own `operations/ops.py` -- a transitive
+  SQLAlchemy-version-drift issue in alembic's own code. First working,
+  by bisection: `1.8.0`.
+- `paramiko==2.7.0`: `ModuleNotFoundError: No module named 'six'` --
+  `ed25519key.py` imports `six` directly, but paramiko's own package
+  metadata at this version doesn't declare it as a dependency, so pip
+  never installs it. A packaging bug in paramiko itself. First working,
+  by bisection: `2.10.0`.
 
 ## [Unreleased] - fixed: why() was blind to ExceptionGroup's sub-exceptions
 

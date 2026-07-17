@@ -291,18 +291,31 @@ jobs:
           - { extra: fastapi, dependency: fastapi, floor: "0.115.0", dependency-version: latest }
           - { extra: pymongo, dependency: pymongo, floor: "4.0.0", dependency-version: floor }
           - { extra: pymongo, dependency: pymongo, floor: "4.0.0", dependency-version: latest }
-          # Floors below are the aspirational ones from pyproject.toml,
-          # not yet corrected against real CI the way every entry above
-          # was (see this job's own comment for what that process found
-          # for the original 30) -- added in the same batch as the
-          # stripe/alembic/paramiko integrations themselves, pending
-          # whatever the first real run against them finds.
-          - { extra: stripe, dependency: stripe, floor: "7.0.0", dependency-version: floor }
-          - { extra: stripe, dependency: stripe, floor: "7.0.0", dependency-version: latest }
-          - { extra: alembic, dependency: alembic, floor: "1.7.0", dependency-version: floor }
-          - { extra: alembic, dependency: alembic, floor: "1.7.0", dependency-version: latest }
-          - { extra: paramiko, dependency: paramiko, floor: "2.7.0", dependency-version: floor }
-          - { extra: paramiko, dependency: paramiko, floor: "2.7.0", dependency-version: latest }
+          # stripe==7.0.0 (the original aspirational floor): no
+          # AttributeError, no missing wheel -- stripe.StripeError and
+          # stripe.CardError simply didn't exist as top-level names yet
+          # (only under the older stripe.error.* path this plugin
+          # doesn't use). First version with the modern top-level
+          # exception classes, confirmed on real Linux: 8.0.0.
+          - { extra: stripe, dependency: stripe, floor: "8.0.0", dependency-version: floor }
+          - { extra: stripe, dependency: stripe, floor: "8.0.0", dependency-version: latest }
+          # alembic==1.7.0 (the original aspirational floor): NameError:
+          # name 'TextClause' is not defined, raised inside alembic's own
+          # operations/ops.py during the @BatchOperations.register_operation
+          # decorator -- a transitive SQLAlchemy-version-drift issue in
+          # alembic's own code, not a whytrail bug. Bisected on real Linux:
+          # 1.7.0 broken, 1.8.0 and up confirmed passing.
+          - { extra: alembic, dependency: alembic, floor: "1.8.0", dependency-version: floor }
+          - { extra: alembic, dependency: alembic, floor: "1.8.0", dependency-version: latest }
+          # paramiko==2.7.0 (the original aspirational floor):
+          # ModuleNotFoundError: No module named 'six' -- ed25519key.py
+          # imports six directly, but paramiko's own package metadata at
+          # this version doesn't declare it as a dependency, so pip/uv
+          # never installs it. A packaging bug in paramiko itself, not a
+          # whytrail bug. Bisected on real Linux: still broken at 2.9.0,
+          # fixed (six import removed entirely) at 2.10.0.
+          - { extra: paramiko, dependency: paramiko, floor: "2.10.0", dependency-version: floor }
+          - { extra: paramiko, dependency: paramiko, floor: "2.10.0", dependency-version: latest }
     steps:
       - uses: actions/checkout@v4
 
