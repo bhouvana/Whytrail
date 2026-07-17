@@ -71,6 +71,25 @@ extras (floors `sendgrid>=6.0`, `websockets>=12.0`,
 `opensearch-py>=2.0`, `pyodbc>=4.0` -- all guesses, not yet bisected
 against real CI).
 
+**Real CI confirmed `websockets`' and `opensearch`'s guessed floors on
+the first try; `sendgrid` and `pyodbc` weren't as lucky:**
+- `sendgrid==6.0.0`: `ModuleNotFoundError: No module named 'yaml'` --
+  sendgrid's own code imports PyYAML directly, but its package
+  metadata at this version doesn't declare it as a dependency
+  (`Requires: python-http-client` only), so pip never installs it. A
+  packaging bug in sendgrid itself, same category as
+  `paramiko==2.7.0`'s missing `six` dependency. First working, by
+  bisection: `6.1.0`.
+- `pyodbc==4.0.0`: no cp313 wheel published, and building from source
+  fails (missing unixODBC headers) -- same "no 3.13 wheel" category as
+  `pydantic==2.0.3`/`pyyaml==6.0`/`grpcio==1.60.0`/`pandas==2.0.0`.
+  Checked every 5.0.x/5.1.x patch release on real Linux: none publish
+  one either. First version with a cp313 wheel: `5.2.0`. (pyodbc's C
+  extension also needs the unixODBC *runtime* library at import time --
+  confirmed already present on `ubuntu-latest`, since this same job's
+  `latest`-pinned sibling entry imports pyodbc successfully today; the
+  wheel gap was the only real bug.)
+
 ### 3 new integrations (batch 2b of the 30-to-60 push): pika, kubernetes, azure-core
 
 Candidates researched by dispatching a background agent to actually

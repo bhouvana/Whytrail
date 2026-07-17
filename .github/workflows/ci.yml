@@ -103,6 +103,9 @@ jobs:
           - websockets
           - opensearch
           - pyodbc
+          - google-genai
+          - oracledb
+          - confluent-kafka
     steps:
       - uses: actions/checkout@v4
 
@@ -359,14 +362,41 @@ jobs:
           # 1.26.0, fixed at 1.27.0.
           - { extra: azure-core, dependency: azure-core, floor: "1.27.0", dependency-version: floor }
           - { extra: azure-core, dependency: azure-core, floor: "1.27.0", dependency-version: latest }
-          - { extra: sendgrid, dependency: sendgrid, floor: "6.0.0", dependency-version: floor }
-          - { extra: sendgrid, dependency: sendgrid, floor: "6.0.0", dependency-version: latest }
+          # sendgrid==6.0.0 (the original aspirational floor):
+          # ModuleNotFoundError: No module named 'yaml' -- sendgrid's own
+          # code imports PyYAML directly, but its package metadata at this
+          # version doesn't declare it as a dependency (Requires:
+          # python-http-client only), so pip/uv never installs it. A
+          # packaging bug in sendgrid itself, the same category as
+          # paramiko==2.7.0's missing six dependency above. Bisected on
+          # real Linux: still broken at 6.0.0, fixed at 6.1.0.
+          - { extra: sendgrid, dependency: sendgrid, floor: "6.1.0", dependency-version: floor }
+          - { extra: sendgrid, dependency: sendgrid, floor: "6.1.0", dependency-version: latest }
           - { extra: websockets, dependency: websockets, floor: "12.0", dependency-version: floor }
           - { extra: websockets, dependency: websockets, floor: "12.0", dependency-version: latest }
           - { extra: opensearch, dependency: opensearch-py, floor: "2.0.0", dependency-version: floor }
           - { extra: opensearch, dependency: opensearch-py, floor: "2.0.0", dependency-version: latest }
-          - { extra: pyodbc, dependency: pyodbc, floor: "4.0.0", dependency-version: floor }
-          - { extra: pyodbc, dependency: pyodbc, floor: "4.0.0", dependency-version: latest }
+          # pyodbc==4.0.0 (the original aspirational floor): no cp313
+          # wheel published, and building from source fails locally
+          # (missing unixODBC headers, sql.h) -- same "no 3.13 wheel"
+          # category as pydantic==2.0.3/pyyaml==6.0/grpcio==1.60.0/
+          # pandas==2.0.0 above. Checked every 5.0.x/5.1.x patch release
+          # on real Linux: none publish a cp313 wheel either. First
+          # version with one, confirmed on real Linux: 5.2.0. (pyodbc's C
+          # extension also needs the unixODBC *runtime* library at
+          # import time, regardless of package version -- confirmed
+          # already present on ubuntu-latest, since this same job's
+          # `latest`-pinned sibling entry below imports pyodbc
+          # successfully today; the wheel gap above was the only real
+          # bug.)
+          - { extra: pyodbc, dependency: pyodbc, floor: "5.2.0", dependency-version: floor }
+          - { extra: pyodbc, dependency: pyodbc, floor: "5.2.0", dependency-version: latest }
+          - { extra: google-genai, dependency: google-genai, floor: "1.0.0", dependency-version: floor }
+          - { extra: google-genai, dependency: google-genai, floor: "1.0.0", dependency-version: latest }
+          - { extra: oracledb, dependency: oracledb, floor: "2.0.0", dependency-version: floor }
+          - { extra: oracledb, dependency: oracledb, floor: "2.0.0", dependency-version: latest }
+          - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.0.0", dependency-version: floor }
+          - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.0.0", dependency-version: latest }
     steps:
       - uses: actions/checkout@v4
 
