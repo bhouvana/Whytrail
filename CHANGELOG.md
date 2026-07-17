@@ -11,10 +11,12 @@ changelog section. Reconstructed retroactively from `git log` (the
 commit that bumped `pyproject.toml`'s version is the same one that did
 the plugin unification), not from memory of what was released when.
 
-## [0.2.1] - elasticsearch, batch-1 plugin growth, plain-English explanations, ExceptionGroup support
+## [0.2.1] - 26 new integrations (34 -> 60, target reached), plain-English explanations, API stability policy, project roadmap
 
-Ten units of work since 0.2.0, newest first. 369 tests pass total;
-`mypy --strict` clean.
+Thirteen units of work since 0.2.0, newest first. 369 tests pass
+total; `mypy --strict` clean; CI green across all three matrices
+(`test`, `plugin-contract-tests`, `plugin-version-matrix`) as of the
+most recent push.
 
 ### Real CI confirmed 8 of the 46 batch 5-6 floor guesses were wrong -- fixed on real Linux
 
@@ -175,6 +177,28 @@ pyproject.toml gained `pymysql`/`pymssql`/`clickhouse`/`snowflake`/
 `graphql-core`/`tenacity`/`newrelic`/`rollbar`/`honeybadger` extras --
 all floors guesses, not yet bisected against real CI.
 
+### CLI: missing script file no longer leaks runpy internals
+
+`whytrail run does_not_exist.py` previously let `runpy.run_path()`
+raise its own `FileNotFoundError`, which `why()` rendered honestly but
+unhelpfully -- a `<frozen runpy>` traceback frame with the
+interpreter's own internal locals (a raw function repr, a memory
+address), not anything about the user's actual mistake. Found by
+actually dogfooding the CLI's real failure paths, not just reviewing
+`--help` output. Now checked explicitly before invoking `runpy`, with
+a clean `whytrail: no such file: X` error. One new test.
+
+### Added the project roadmap, phases A through Q
+
+`docs/roadmap.md`: the long-range plan behind this session's work,
+written so "what's next and why" doesn't have to be re-derived from
+git history each time. Phases C/E/G/H/I have concrete near-term work;
+K/L/N/O/P are explicit decisions deferred to a real trigger (a second
+contributor, real user feedback, a specific request) rather than
+fabricated work items, named that way deliberately rather than padded
+out to look complete. Q ties back to the still-open 1.0 question
+`api-stability.md` already raised.
+
 ### 3 new integrations (batch 4 of the 30-to-60 push): google-genai, oracledb, confluent-kafka
 
 Checked directly against real objects, not docs. `fastavro` and
@@ -219,6 +243,17 @@ pyproject.toml gained `google-genai`/`oracledb`/`confluent-kafka`
 extras (floors `google-genai>=1.0`, `oracledb>=2.0`,
 `confluent-kafka>=2.0` -- all guesses, not yet bisected against real
 CI).
+
+### Added API stability policy doc
+
+`docs/api-stability.md`: what's actually stable in practice pre-1.0
+(the five verbs, `Explanation`/`ExplanationStep`/`Confidence`, the
+frozen Explainer Protocol v1) versus what's still moving
+(`ExplanationStep`'s field set, `__all__`, integration internals).
+Also names a real documentation gap plainly rather than leaving it
+implicit: no ADR states a checkable bar for cutting 1.0, and this
+project's own 0.1.0 entry (below) cites one -- "the packaging policy
+in the ADR" -- that doesn't actually exist in the ADR it points to.
 
 ### 4 new integrations (batch 3 of the 30-to-60 push): sendgrid, websockets, opensearch, pyodbc
 
