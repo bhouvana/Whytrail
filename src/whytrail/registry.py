@@ -73,6 +73,7 @@ _BUILTIN_EXPLAINERS = (
     "stripe",
     "alembic",
     "paramiko",
+    "elasticsearch",
 )
 
 

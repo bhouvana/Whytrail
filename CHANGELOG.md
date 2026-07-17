@@ -3,6 +3,30 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] - 1 new integration (batch 2 of the 30-to-60 push): elasticsearch
+
+`elasticsearch.ApiError` (covering `NotFoundError`, `ConflictError`,
+`AuthorizationException`, etc.) carries the HTTP status via `.meta.status`
+and the full structured error body Elasticsearch itself returned via
+`.body` -- both collapsed by `str(exc)` into a single line that drops
+which index/resource was involved and the actual reason. Verified
+against a real request/response round trip through a throwaway local
+HTTP server standing in for a cluster (no live Elasticsearch needed),
+the same pattern used for every other plugin's contract tests.
+
+The full `.body` goes through `locals`, never `description`: a
+`parsing_exception`'s `reason` field routinely echoes the offending
+query text verbatim, so nothing inside the body is safe in a field
+`.redacted()` doesn't strip. Only the HTTP status is safe in
+`description`. Confirmed by planting a known query fragment in the
+body and asserting it survives in `locals` but not in the redacted
+text.
+
+pyproject.toml gained an `elasticsearch` extra (floor `elasticsearch>=8.0`).
+268 tests pass total; `mypy --strict` clean. Floor verified locally
+against `elasticsearch==8.0.0` before push; treated as a guess until
+real CI confirms it, same discipline as every prior floor.
+
 ## [Unreleased] - 3 new integrations (batch 1 of the 30-to-60 push): stripe, alembic, paramiko
 
 First batch of growing the integration count, each checked against

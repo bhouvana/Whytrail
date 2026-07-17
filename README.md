@@ -63,7 +63,7 @@ pip install whytrail[requests]  # + auto-explain requests.RequestException, etc.
 pip install whytrail[all]       # every integration below, one install
 ```
 
-One package, one version -- all 30 integrations below are extras of
+One package, one version -- all integrations below are extras of
 `whytrail` itself, not separate PyPI packages (ADR 0006). `pip install
 whytrail[X]` pulls in exactly the library `X` explains, nothing else;
 `why()` picks it up automatically the moment it's installed, no further
@@ -90,7 +90,7 @@ are extras of this same package, not new verbs -- see
 
 ## Ecosystem
 
-33 integrations today and growing, each earning its place by clearing
+34 integrations today and growing, each earning its place by clearing
 one of three bars (structured error data, a security-sensitive
 boundary, or a non-standard capture mechanism) rather than existing
 just to exist -- see `docs/adr/0003-ecosystem-scale-triage.md` for the
@@ -110,10 +110,11 @@ adds: `docs/plugin-guide.md`.
 | `whytrail[pydantic]` | `whytrail[marshmallow]` | `whytrail[jsonschema]` |
 | `whytrail[pyyaml]` | `whytrail[pandas]` | `whytrail[polars]` |
 | `whytrail[stripe]` | `whytrail[alembic]` | `whytrail[paramiko]` |
-| `whytrail[sentry]` | `whytrail[ddtrace]` | `whytrail[celery]` |
-| `whytrail[rq]` | `whytrail[dramatiq]` | `whytrail[prefect]` |
-| `whytrail[scrapy]` | `whytrail[pytest]` | `whytrail[fastapi]` |
-| `whytrail[django]` | `whytrail[flask]` | `whytrail[langchain]` |
+| `whytrail[elasticsearch]` | `whytrail[sentry]` | `whytrail[ddtrace]` |
+| `whytrail[celery]` | `whytrail[rq]` | `whytrail[dramatiq]` |
+| `whytrail[prefect]` | `whytrail[scrapy]` | `whytrail[pytest]` |
+| `whytrail[fastapi]` | `whytrail[django]` | `whytrail[flask]` |
+| `whytrail[langchain]` |
 
 All of the above in one install: `pip install whytrail[all]`. Want to publish your
 own, outside this repo, for a library not on this list?

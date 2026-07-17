@@ -238,7 +238,7 @@ a security-relevant integration needs to clear.
 
 ## The integrations that exist today
 
-33, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
+34, all bundled (ADR 0006), growing toward 60 (see `CHANGELOG.md` for
 batch-by-batch progress). Each earns its place by clearing one of the
 three bars in ADR 0003, verified against real objects, not assumed from
 documentation -- several of these (marked *) were corrected after their
@@ -270,6 +270,7 @@ carry no structured data beyond what tier 1 already shows for free.
 | [`stripe`](../src/whytrail/integrations/stripe.py) | explainer | `StripeError` code/param/http_status, redacted response body |
 | [`alembic`](../src/whytrail/integrations/alembic.py) | explainer | `ResolutionError`/`MultipleHeads` -- the actual bad revision id / ambiguous heads |
 | [`paramiko`](../src/whytrail/integrations/paramiko.py) | explainer | `BadHostKeyException` as key fingerprints, never raw key material |
+| [`elasticsearch`](../src/whytrail/integrations/elasticsearch.py) | explainer | `ApiError` HTTP status + redacted response body (`.body`'s `reason` can echo a raw query) |
 | [`sentry`](../src/whytrail/integrations/sentry.py) | integration | Attaches explanations to Sentry events via `before_send` |
 | [`otel`](../src/whytrail/otel.py) (core module, always bundled) | integration | Attaches explanations to the current OpenTelemetry span |
 | [`ddtrace`](../src/whytrail/integrations/ddtrace.py) | integration | Same, for Datadog spans |

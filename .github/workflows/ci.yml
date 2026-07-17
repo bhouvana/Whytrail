@@ -76,6 +76,7 @@ jobs:
           - stripe
           - alembic
           - paramiko
+          - elasticsearch
     steps:
       - uses: actions/checkout@v4
 
@@ -316,6 +317,8 @@ jobs:
           # fixed (six import removed entirely) at 2.10.0.
           - { extra: paramiko, dependency: paramiko, floor: "2.10.0", dependency-version: floor }
           - { extra: paramiko, dependency: paramiko, floor: "2.10.0", dependency-version: latest }
+          - { extra: elasticsearch, dependency: elasticsearch, floor: "8.0.0", dependency-version: floor }
+          - { extra: elasticsearch, dependency: elasticsearch, floor: "8.0.0", dependency-version: latest }
     steps:
       - uses: actions/checkout@v4
 
