@@ -22,7 +22,6 @@ type and location; `.problem`/`.context`/the snippet all go through
 
 from __future__ import annotations
 
-import typing as t
 
 import yaml
 

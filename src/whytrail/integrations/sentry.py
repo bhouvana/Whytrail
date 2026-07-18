@@ -17,7 +17,7 @@ import whytrail
 _CONTEXT_KEY = "whytrail"
 
 
-def before_send(event: dict, hint: dict, *, include_locals: bool = False) -> dict:
+def before_send(event: dict[str, t.Any], hint: dict[str, t.Any], *, include_locals: bool = False) -> dict[str, t.Any]:
     """Pass directly to sentry_sdk.init(before_send=...), or compose
     with an existing hook via chain().
 
@@ -60,8 +60,8 @@ def before_send(event: dict, hint: dict, *, include_locals: bool = False) -> dic
 
 
 def chain(
-    existing: t.Callable[[dict, dict], dict | None] | None,
-) -> t.Callable[[dict, dict], dict | None]:
+    existing: t.Callable[[dict[str, t.Any], dict[str, t.Any]], dict[str, t.Any] | None] | None,
+) -> t.Callable[[dict[str, t.Any], dict[str, t.Any]], dict[str, t.Any] | None]:
     """Compose whytrail's before_send with a caller's existing hook, so
     adding whytrail-sentry doesn't require giving up existing
     before_send logic.
@@ -71,10 +71,10 @@ def chain(
     if existing is None:
         return before_send
 
-    def combined(event: dict, hint: dict) -> dict | None:
-        event = existing(event, hint)
-        if event is None:
+    def combined(event: dict[str, t.Any], hint: dict[str, t.Any]) -> dict[str, t.Any] | None:
+        updated_event = existing(event, hint)
+        if updated_event is None:
             return None
-        return before_send(event, hint)
+        return before_send(updated_event, hint)
 
     return combined

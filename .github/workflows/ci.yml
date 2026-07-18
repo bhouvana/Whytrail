@@ -15,6 +15,25 @@ on:
     - cron: "0 6 * * 1"
 
 jobs:
+  lint:
+    # Deliberately its own fast, single-OS/single-Python job rather than
+    # a step repeated across the full `test` matrix (12 combinations) --
+    # ruff's own findings don't vary by OS or Python version, so running
+    # it once is exactly as much signal as running it twelve times, at
+    # 1/12th the cost. Added after a real bug (BaseExceptionGroup used
+    # with no Python-3.11+ guard, in a test claiming to support 3.10)
+    # was found by running `ruff check` locally rather than by any CI
+    # job actually catching it -- this closes that gap going forward.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check src/ tests/ examples/ benchmarks/
+
   test:
     # Skip on the weekly schedule trigger: this job doesn't touch plugin
     # dependency floors (the thing that goes stale between pushes), so
@@ -122,6 +141,8 @@ jobs:
           - zeep
           - elastic-apm
           - bugsnag
+          - structlog
+          - loguru
     steps:
       - uses: actions/checkout@v4
 
@@ -156,6 +177,27 @@ jobs:
           name="${{ matrix.extra }}"
           test_name="${name//-/_}"
           pytest "tests/plugin_contract/test_${test_name}_plugin.py" -q
+
+      - name: Type-check this integration module with mypy --strict
+        run: |
+          # pyproject.toml's mypy config excludes src/whytrail/integrations/
+          # with a comment claiming each module "is checked individually
+          # in CI instead, each with its own third-party stubs/dependency
+          # installed" -- a real gap found auditing for this release: no
+          # CI job actually did that anywhere, so all 63 integration
+          # modules had never been type-checked at all. This step closes
+          # it using the extra this job already installed, rather than
+          # adding a second matrix.
+          #
+          # `pytest` extra's module is pytest_plugin.py, not pytest.py --
+          # a bare pytest.py would shadow the real pytest package name
+          # for anything importing it unqualified.
+          name="${{ matrix.extra }}"
+          module_name="${name//-/_}"
+          if [ "$module_name" = "pytest" ]; then
+            module_name="pytest_plugin"
+          fi
+          mypy --strict "src/whytrail/integrations/${module_name}.py"
 
   plugin-version-matrix:
     # docs/testing-maturity.md gap #1: every extra above installs
@@ -493,6 +535,16 @@ jobs:
           - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15.0", dependency-version: latest }
           - { extra: bugsnag, dependency: bugsnag, floor: "4.5.0", dependency-version: floor }
           - { extra: bugsnag, dependency: bugsnag, floor: "4.5.0", dependency-version: latest }
+          # structlog/loguru floors: aspirational, matching pyproject.toml
+          # -- not yet confirmed against a real CI run the way every floor
+          # above this comment was (each of those started the same way and
+          # was corrected where wrong; see CHANGELOG.md's batch-by-batch
+          # floor-correction history). Flagged here rather than presented
+          # as verified.
+          - { extra: structlog, dependency: structlog, floor: "23.0.0", dependency-version: floor }
+          - { extra: structlog, dependency: structlog, floor: "23.0.0", dependency-version: latest }
+          - { extra: loguru, dependency: loguru, floor: "0.7.0", dependency-version: floor }
+          - { extra: loguru, dependency: loguru, floor: "0.7.0", dependency-version: latest }
     steps:
       - uses: actions/checkout@v4
 
@@ -524,6 +576,265 @@ jobs:
           test_name="${name//-/_}"
           pytest "tests/plugin_contract/test_${test_name}_plugin.py" -q
 
+  plugin-version-matrix-py-range:
+    # testing-maturity.md gap #1 / roadmap.md Phase H: plugin-version-matrix
+    # above only ever runs on Python 3.13 -- the 3.10/3.11/3.12 floors every
+    # extra also claims to support in pyproject.toml have never actually
+    # been installed and exercised the way 3.13's was. That gap is real:
+    # checking 3.13 alone already found 20 version-compatibility bugs (see
+    # docs/testing-maturity.md), and several of those were 3.13-specific
+    # packaging/runtime incompatibilities in the dependency itself -- which
+    # means the *original* floor in pyproject.toml (not the 3.13-corrected
+    # floor pinned in plugin-version-matrix above) may well already be
+    # correct for 3.10-3.12. This job checks that claim for real instead of
+    # assuming it, using pyproject.toml's own stated floor for every extra.
+    #
+    # Deliberately weekly-only (`schedule` trigger), not on every push/PR:
+    # docs/roadmap.md Phase H already names the tradeoff directly --
+    # "every additional Python version roughly multiplies plugin-version-
+    # matrix's job count, so this should land deliberately, not accidentally
+    # via scope creep" -- and this job triples plugin-version-matrix's floor
+    # checks (62 extras x 3 additional Python versions = 186 jobs). A
+    # dependency's stated floor changes rarely enough that weekly detection
+    # (the same cadence plugin-version-matrix already runs on, alongside
+    # every push) is the right cost/signal tradeoff, not every PR paying for
+    # a check whose answer essentially never changes between pushes.
+    #
+    # Deliberately floor-only, not floor+latest: "latest" is not a
+    # per-Python-version claim pyproject.toml makes (it's just "whatever pip
+    # resolves today"), so there's no stated claim to verify the way there is
+    # for the floor -- doubling this job to also check latest across three
+    # more Python versions would be six times the cost of plugin-version-
+    # matrix's existing 3.13 coverage for a question this job isn't asking.
+    #
+    # oracledb is included here (unlike test_redaction_fuzz.py's exclusion
+    # of it): that exclusion was about *repeating* a real connection attempt
+    # across dozens of Hypothesis examples, not about running its contract
+    # test once per Python version, which is exactly what every other extra
+    # in this job already does.
+    #
+    # Read a failure here the same way docs/testing-maturity.md frames the
+    # 3.13 round: evidence of what's actually broken, not proof that
+    # everything else is fine -- the same "confirmed working" vs. "works in
+    # any condition" distinction that document draws explicitly.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { extra: requests, dependency: requests, floor: "2.20", python-version: "3.10" }
+          - { extra: httpx, dependency: httpx, floor: "0.27", python-version: "3.10" }
+          - { extra: aiohttp, dependency: aiohttp, floor: "3.9", python-version: "3.10" }
+          - { extra: huggingface-hub, dependency: huggingface_hub, floor: "0.20", python-version: "3.10" }
+          - { extra: openai, dependency: openai, floor: "1.0", python-version: "3.10" }
+          - { extra: anthropic, dependency: anthropic, floor: "0.30", python-version: "3.10" }
+          - { extra: boto3, dependency: boto3, floor: "1.34", python-version: "3.10" }
+          - { extra: google-cloud, dependency: google-api-core, floor: "2.15", python-version: "3.10" }
+          - { extra: sqlalchemy, dependency: sqlalchemy, floor: "2.0", python-version: "3.10" }
+          - { extra: asyncpg, dependency: asyncpg, floor: "0.29", python-version: "3.10" }
+          - { extra: pymongo, dependency: pymongo, floor: "4.0", python-version: "3.10" }
+          - { extra: grpcio, dependency: grpcio, floor: "1.60", python-version: "3.10" }
+          - { extra: pydantic, dependency: pydantic, floor: "2.0", python-version: "3.10" }
+          - { extra: marshmallow, dependency: marshmallow, floor: "3.0", python-version: "3.10" }
+          - { extra: jsonschema, dependency: jsonschema, floor: "4.0", python-version: "3.10" }
+          - { extra: pyyaml, dependency: pyyaml, floor: "6.0", python-version: "3.10" }
+          - { extra: pandas, dependency: pandas, floor: "2.0", python-version: "3.10" }
+          - { extra: polars, dependency: polars, floor: "0.20", python-version: "3.10" }
+          - { extra: stripe, dependency: stripe, floor: "7.0", python-version: "3.10" }
+          - { extra: alembic, dependency: alembic, floor: "1.7", python-version: "3.10" }
+          - { extra: paramiko, dependency: paramiko, floor: "2.7", python-version: "3.10" }
+          - { extra: elasticsearch, dependency: elasticsearch, floor: "8.0", python-version: "3.10" }
+          - { extra: pika, dependency: pika, floor: "1.1", python-version: "3.10" }
+          - { extra: kubernetes, dependency: kubernetes, floor: "18.20", python-version: "3.10" }
+          - { extra: azure-core, dependency: azure-core, floor: "1.24", python-version: "3.10" }
+          - { extra: sendgrid, dependency: sendgrid, floor: "6.0", python-version: "3.10" }
+          - { extra: websockets, dependency: websockets, floor: "12.0", python-version: "3.10" }
+          - { extra: opensearch, dependency: opensearch-py, floor: "2.0", python-version: "3.10" }
+          - { extra: pyodbc, dependency: pyodbc, floor: "4.0", python-version: "3.10" }
+          - { extra: google-genai, dependency: google-genai, floor: "1.0", python-version: "3.10" }
+          - { extra: oracledb, dependency: oracledb, floor: "2.0", python-version: "3.10" }
+          - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.0", python-version: "3.10" }
+          - { extra: pymysql, dependency: pymysql, floor: "1.0", python-version: "3.10" }
+          - { extra: pymssql, dependency: pymssql, floor: "2.2", python-version: "3.10" }
+          - { extra: clickhouse, dependency: clickhouse-connect, floor: "0.6", python-version: "3.10" }
+          - { extra: snowflake, dependency: snowflake-connector-python, floor: "3.0", python-version: "3.10" }
+          - { extra: graphql-core, dependency: graphql-core, floor: "3.2", python-version: "3.10" }
+          - { extra: tenacity, dependency: tenacity, floor: "8.0", python-version: "3.10" }
+          - { extra: psycopg, dependency: psycopg, floor: "3.1", python-version: "3.10" }
+          - { extra: cassandra, dependency: cassandra-driver, floor: "3.25", python-version: "3.10" }
+          - { extra: influxdb, dependency: influxdb-client, floor: "1.30", python-version: "3.10" }
+          - { extra: pyzmq, dependency: pyzmq, floor: "24.0", python-version: "3.10" }
+          - { extra: zeep, dependency: zeep, floor: "4.1", python-version: "3.10" }
+          - { extra: sentry, dependency: sentry-sdk, floor: "2.0", python-version: "3.10" }
+          - { extra: ddtrace, dependency: ddtrace, floor: "2.0", python-version: "3.10" }
+          - { extra: celery, dependency: celery, floor: "5.3", python-version: "3.10" }
+          - { extra: rq, dependency: rq, floor: "1.15", python-version: "3.10" }
+          - { extra: dramatiq, dependency: dramatiq, floor: "1.14", python-version: "3.10" }
+          - { extra: prefect, dependency: prefect, floor: "2.14", python-version: "3.10" }
+          - { extra: scrapy, dependency: scrapy, floor: "2.8", python-version: "3.10" }
+          - { extra: pytest, dependency: pytest, floor: "7.0", python-version: "3.10" }
+          - { extra: fastapi, dependency: fastapi, floor: "0.115.0", python-version: "3.10" }
+          - { extra: django, dependency: django, floor: "4.2", python-version: "3.10" }
+          - { extra: flask, dependency: flask, floor: "2.3", python-version: "3.10" }
+          - { extra: langchain, dependency: langchain-core, floor: "0.2", python-version: "3.10" }
+          - { extra: newrelic, dependency: newrelic, floor: "9.0", python-version: "3.10" }
+          - { extra: rollbar, dependency: rollbar, floor: "1.0", python-version: "3.10" }
+          - { extra: honeybadger, dependency: honeybadger, floor: "0.15", python-version: "3.10" }
+          - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15", python-version: "3.10" }
+          - { extra: bugsnag, dependency: bugsnag, floor: "4.5", python-version: "3.10" }
+          - { extra: structlog, dependency: structlog, floor: "23.0", python-version: "3.10" }
+          - { extra: loguru, dependency: loguru, floor: "0.7", python-version: "3.10" }
+          - { extra: requests, dependency: requests, floor: "2.20", python-version: "3.11" }
+          - { extra: httpx, dependency: httpx, floor: "0.27", python-version: "3.11" }
+          - { extra: aiohttp, dependency: aiohttp, floor: "3.9", python-version: "3.11" }
+          - { extra: huggingface-hub, dependency: huggingface_hub, floor: "0.20", python-version: "3.11" }
+          - { extra: openai, dependency: openai, floor: "1.0", python-version: "3.11" }
+          - { extra: anthropic, dependency: anthropic, floor: "0.30", python-version: "3.11" }
+          - { extra: boto3, dependency: boto3, floor: "1.34", python-version: "3.11" }
+          - { extra: google-cloud, dependency: google-api-core, floor: "2.15", python-version: "3.11" }
+          - { extra: sqlalchemy, dependency: sqlalchemy, floor: "2.0", python-version: "3.11" }
+          - { extra: asyncpg, dependency: asyncpg, floor: "0.29", python-version: "3.11" }
+          - { extra: pymongo, dependency: pymongo, floor: "4.0", python-version: "3.11" }
+          - { extra: grpcio, dependency: grpcio, floor: "1.60", python-version: "3.11" }
+          - { extra: pydantic, dependency: pydantic, floor: "2.0", python-version: "3.11" }
+          - { extra: marshmallow, dependency: marshmallow, floor: "3.0", python-version: "3.11" }
+          - { extra: jsonschema, dependency: jsonschema, floor: "4.0", python-version: "3.11" }
+          - { extra: pyyaml, dependency: pyyaml, floor: "6.0", python-version: "3.11" }
+          - { extra: pandas, dependency: pandas, floor: "2.0", python-version: "3.11" }
+          - { extra: polars, dependency: polars, floor: "0.20", python-version: "3.11" }
+          - { extra: stripe, dependency: stripe, floor: "7.0", python-version: "3.11" }
+          - { extra: alembic, dependency: alembic, floor: "1.7", python-version: "3.11" }
+          - { extra: paramiko, dependency: paramiko, floor: "2.7", python-version: "3.11" }
+          - { extra: elasticsearch, dependency: elasticsearch, floor: "8.0", python-version: "3.11" }
+          - { extra: pika, dependency: pika, floor: "1.1", python-version: "3.11" }
+          - { extra: kubernetes, dependency: kubernetes, floor: "18.20", python-version: "3.11" }
+          - { extra: azure-core, dependency: azure-core, floor: "1.24", python-version: "3.11" }
+          - { extra: sendgrid, dependency: sendgrid, floor: "6.0", python-version: "3.11" }
+          - { extra: websockets, dependency: websockets, floor: "12.0", python-version: "3.11" }
+          - { extra: opensearch, dependency: opensearch-py, floor: "2.0", python-version: "3.11" }
+          - { extra: pyodbc, dependency: pyodbc, floor: "4.0", python-version: "3.11" }
+          - { extra: google-genai, dependency: google-genai, floor: "1.0", python-version: "3.11" }
+          - { extra: oracledb, dependency: oracledb, floor: "2.0", python-version: "3.11" }
+          - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.0", python-version: "3.11" }
+          - { extra: pymysql, dependency: pymysql, floor: "1.0", python-version: "3.11" }
+          - { extra: pymssql, dependency: pymssql, floor: "2.2", python-version: "3.11" }
+          - { extra: clickhouse, dependency: clickhouse-connect, floor: "0.6", python-version: "3.11" }
+          - { extra: snowflake, dependency: snowflake-connector-python, floor: "3.0", python-version: "3.11" }
+          - { extra: graphql-core, dependency: graphql-core, floor: "3.2", python-version: "3.11" }
+          - { extra: tenacity, dependency: tenacity, floor: "8.0", python-version: "3.11" }
+          - { extra: psycopg, dependency: psycopg, floor: "3.1", python-version: "3.11" }
+          - { extra: cassandra, dependency: cassandra-driver, floor: "3.25", python-version: "3.11" }
+          - { extra: influxdb, dependency: influxdb-client, floor: "1.30", python-version: "3.11" }
+          - { extra: pyzmq, dependency: pyzmq, floor: "24.0", python-version: "3.11" }
+          - { extra: zeep, dependency: zeep, floor: "4.1", python-version: "3.11" }
+          - { extra: sentry, dependency: sentry-sdk, floor: "2.0", python-version: "3.11" }
+          - { extra: ddtrace, dependency: ddtrace, floor: "2.0", python-version: "3.11" }
+          - { extra: celery, dependency: celery, floor: "5.3", python-version: "3.11" }
+          - { extra: rq, dependency: rq, floor: "1.15", python-version: "3.11" }
+          - { extra: dramatiq, dependency: dramatiq, floor: "1.14", python-version: "3.11" }
+          - { extra: prefect, dependency: prefect, floor: "2.14", python-version: "3.11" }
+          - { extra: scrapy, dependency: scrapy, floor: "2.8", python-version: "3.11" }
+          - { extra: pytest, dependency: pytest, floor: "7.0", python-version: "3.11" }
+          - { extra: fastapi, dependency: fastapi, floor: "0.115.0", python-version: "3.11" }
+          - { extra: django, dependency: django, floor: "4.2", python-version: "3.11" }
+          - { extra: flask, dependency: flask, floor: "2.3", python-version: "3.11" }
+          - { extra: langchain, dependency: langchain-core, floor: "0.2", python-version: "3.11" }
+          - { extra: newrelic, dependency: newrelic, floor: "9.0", python-version: "3.11" }
+          - { extra: rollbar, dependency: rollbar, floor: "1.0", python-version: "3.11" }
+          - { extra: honeybadger, dependency: honeybadger, floor: "0.15", python-version: "3.11" }
+          - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15", python-version: "3.11" }
+          - { extra: bugsnag, dependency: bugsnag, floor: "4.5", python-version: "3.11" }
+          - { extra: structlog, dependency: structlog, floor: "23.0", python-version: "3.11" }
+          - { extra: loguru, dependency: loguru, floor: "0.7", python-version: "3.11" }
+          - { extra: requests, dependency: requests, floor: "2.20", python-version: "3.12" }
+          - { extra: httpx, dependency: httpx, floor: "0.27", python-version: "3.12" }
+          - { extra: aiohttp, dependency: aiohttp, floor: "3.9", python-version: "3.12" }
+          - { extra: huggingface-hub, dependency: huggingface_hub, floor: "0.20", python-version: "3.12" }
+          - { extra: openai, dependency: openai, floor: "1.0", python-version: "3.12" }
+          - { extra: anthropic, dependency: anthropic, floor: "0.30", python-version: "3.12" }
+          - { extra: boto3, dependency: boto3, floor: "1.34", python-version: "3.12" }
+          - { extra: google-cloud, dependency: google-api-core, floor: "2.15", python-version: "3.12" }
+          - { extra: sqlalchemy, dependency: sqlalchemy, floor: "2.0", python-version: "3.12" }
+          - { extra: asyncpg, dependency: asyncpg, floor: "0.29", python-version: "3.12" }
+          - { extra: pymongo, dependency: pymongo, floor: "4.0", python-version: "3.12" }
+          - { extra: grpcio, dependency: grpcio, floor: "1.60", python-version: "3.12" }
+          - { extra: pydantic, dependency: pydantic, floor: "2.0", python-version: "3.12" }
+          - { extra: marshmallow, dependency: marshmallow, floor: "3.0", python-version: "3.12" }
+          - { extra: jsonschema, dependency: jsonschema, floor: "4.0", python-version: "3.12" }
+          - { extra: pyyaml, dependency: pyyaml, floor: "6.0", python-version: "3.12" }
+          - { extra: pandas, dependency: pandas, floor: "2.0", python-version: "3.12" }
+          - { extra: polars, dependency: polars, floor: "0.20", python-version: "3.12" }
+          - { extra: stripe, dependency: stripe, floor: "7.0", python-version: "3.12" }
+          - { extra: alembic, dependency: alembic, floor: "1.7", python-version: "3.12" }
+          - { extra: paramiko, dependency: paramiko, floor: "2.7", python-version: "3.12" }
+          - { extra: elasticsearch, dependency: elasticsearch, floor: "8.0", python-version: "3.12" }
+          - { extra: pika, dependency: pika, floor: "1.1", python-version: "3.12" }
+          - { extra: kubernetes, dependency: kubernetes, floor: "18.20", python-version: "3.12" }
+          - { extra: azure-core, dependency: azure-core, floor: "1.24", python-version: "3.12" }
+          - { extra: sendgrid, dependency: sendgrid, floor: "6.0", python-version: "3.12" }
+          - { extra: websockets, dependency: websockets, floor: "12.0", python-version: "3.12" }
+          - { extra: opensearch, dependency: opensearch-py, floor: "2.0", python-version: "3.12" }
+          - { extra: pyodbc, dependency: pyodbc, floor: "4.0", python-version: "3.12" }
+          - { extra: google-genai, dependency: google-genai, floor: "1.0", python-version: "3.12" }
+          - { extra: oracledb, dependency: oracledb, floor: "2.0", python-version: "3.12" }
+          - { extra: confluent-kafka, dependency: confluent-kafka, floor: "2.0", python-version: "3.12" }
+          - { extra: pymysql, dependency: pymysql, floor: "1.0", python-version: "3.12" }
+          - { extra: pymssql, dependency: pymssql, floor: "2.2", python-version: "3.12" }
+          - { extra: clickhouse, dependency: clickhouse-connect, floor: "0.6", python-version: "3.12" }
+          - { extra: snowflake, dependency: snowflake-connector-python, floor: "3.0", python-version: "3.12" }
+          - { extra: graphql-core, dependency: graphql-core, floor: "3.2", python-version: "3.12" }
+          - { extra: tenacity, dependency: tenacity, floor: "8.0", python-version: "3.12" }
+          - { extra: psycopg, dependency: psycopg, floor: "3.1", python-version: "3.12" }
+          - { extra: cassandra, dependency: cassandra-driver, floor: "3.25", python-version: "3.12" }
+          - { extra: influxdb, dependency: influxdb-client, floor: "1.30", python-version: "3.12" }
+          - { extra: pyzmq, dependency: pyzmq, floor: "24.0", python-version: "3.12" }
+          - { extra: zeep, dependency: zeep, floor: "4.1", python-version: "3.12" }
+          - { extra: sentry, dependency: sentry-sdk, floor: "2.0", python-version: "3.12" }
+          - { extra: ddtrace, dependency: ddtrace, floor: "2.0", python-version: "3.12" }
+          - { extra: celery, dependency: celery, floor: "5.3", python-version: "3.12" }
+          - { extra: rq, dependency: rq, floor: "1.15", python-version: "3.12" }
+          - { extra: dramatiq, dependency: dramatiq, floor: "1.14", python-version: "3.12" }
+          - { extra: prefect, dependency: prefect, floor: "2.14", python-version: "3.12" }
+          - { extra: scrapy, dependency: scrapy, floor: "2.8", python-version: "3.12" }
+          - { extra: pytest, dependency: pytest, floor: "7.0", python-version: "3.12" }
+          - { extra: fastapi, dependency: fastapi, floor: "0.115.0", python-version: "3.12" }
+          - { extra: django, dependency: django, floor: "4.2", python-version: "3.12" }
+          - { extra: flask, dependency: flask, floor: "2.3", python-version: "3.12" }
+          - { extra: langchain, dependency: langchain-core, floor: "0.2", python-version: "3.12" }
+          - { extra: newrelic, dependency: newrelic, floor: "9.0", python-version: "3.12" }
+          - { extra: rollbar, dependency: rollbar, floor: "1.0", python-version: "3.12" }
+          - { extra: honeybadger, dependency: honeybadger, floor: "0.15", python-version: "3.12" }
+          - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15", python-version: "3.12" }
+          - { extra: bugsnag, dependency: bugsnag, floor: "4.5", python-version: "3.12" }
+          - { extra: structlog, dependency: structlog, floor: "23.0", python-version: "3.12" }
+          - { extra: loguru, dependency: loguru, floor: "0.7", python-version: "3.12" }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install whytrail (core only -- the dependency under test is pinned separately below)
+        run: pip install -e ".[dev]"
+
+      - name: Install this integration's test-only tools, if any
+        run: |
+          case "${{ matrix.extra }}" in
+            fastapi) pip install httpx ;;
+            rq) pip install fakeredis ;;
+          esac
+
+      - name: Install the dependency at pyproject.toml's stated floor
+        run: pip install "${{ matrix.dependency }}==${{ matrix.floor }}"
+
+      - name: Run this integration's contract tests
+        run: |
+          name="${{ matrix.extra }}"
+          test_name="${name//-/_}"
+          pytest "tests/plugin_contract/test_${test_name}_plugin.py" -q
+
   benchmarks:
     # Skip on the weekly schedule trigger, same reasoning as `test` above.
     if: github.event_name != 'schedule'
@@ -537,3 +848,74 @@ jobs:
       - name: Run performance benchmarks (informational, not a merge gate yet)
         run: pytest benchmarks/ --benchmark-only
         continue-on-error: true
+
+      # Regression gate, added on explicit request. No fixed numeric
+      # threshold ("track() must stay under 3us forever") -- confirmed
+      # directly (see the two runs recorded in this comment's history)
+      # that GitHub-hosted runner variance alone is a meaningfully larger
+      # effect than that would tolerate, which would make a hard absolute
+      # threshold fail on noise, not on real regressions. Instead: cache
+      # `.benchmarks/` across runs on this same OS/Python combination via
+      # actions/cache, and use pytest-benchmark's own `--benchmark-compare`
+      # against whatever the *previous* run on this branch actually
+      # recorded, gated generously (min:400% -- fail only past a 5x
+      # slowdown). That threshold is deliberately far above normal
+      # run-to-run noise and comfortably below the ~100x regression this
+      # benchmark suite's own history already caught once (see
+      # benchmarks/test_overhead.py's docstring) -- it exists to catch an
+      # order-of-magnitude regression, not to be a tight bound.
+      #
+      # No baseline is committed to the repo: a baseline generated locally
+      # (this session ran on Windows) lives under a different
+      # machine-info bucket than `ubuntu-latest` and would never be
+      # matched by --benchmark-compare on CI, or worse, would be compared
+      # against as if it were a like-for-like number when it isn't. The
+      # cache below is deliberately the only source of history, and it
+      # starts from whatever this job's *first* real run on GitHub's
+      # actual runners records -- not from anything produced in this
+      # sandbox. The first real run establishes the baseline and cannot
+      # fail this step (pytest-benchmark skips the compare-fail gate
+      # gracefully when there is nothing yet to compare against, confirmed
+      # directly by running with an empty storage directory rather than
+      # assumed from its docs).
+      - name: Restore previous benchmark history for this OS/Python combination
+        uses: actions/cache@v4
+        with:
+          path: .benchmarks
+          key: benchmarks-ubuntu-latest-py3.12-${{ github.run_id }}
+          restore-keys: |
+            benchmarks-ubuntu-latest-py3.12-
+
+      - name: Performance regression gate (compare against last run, generous tolerance)
+        run: pytest benchmarks/ --benchmark-only --benchmark-compare --benchmark-compare-fail=min:400% --benchmark-autosave
+
+  mutation-testing:
+    # Weekly only, same reasoning as plugin-version-matrix-py-range:
+    # mutmut re-runs the scoped test selection once per mutant, which
+    # is real cost for real signal, not something every push/PR should
+    # pay for. Informational (not a merge gate) -- this answers "does
+    # the test suite actually detect wrong behavior in the engine,"
+    # which is a question worth tracking over time, not one with an
+    # agreed pass/fail bar yet.
+    #
+    # No native Windows support (confirmed directly -- mutmut's own CLI
+    # refuses to run and points at WSL); ubuntu-latest needs no
+    # translation layer, unlike the sandbox this was developed in.
+    #
+    # Scoped to src/whytrail/core (see pyproject.toml's [tool.mutmut]
+    # for why: the shared engine every other consumer sits on top of,
+    # not the 63 integrations or the CLI, which would multiply mutant
+    # count for a question this scope already answers about the
+    # foundation they all sit on).
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]" mutmut
+      - name: Run mutation testing against core/ (informational)
+        run: python -m mutmut run || true
+      - name: Show results
+        run: python -m mutmut results

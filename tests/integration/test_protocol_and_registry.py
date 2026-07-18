@@ -99,3 +99,76 @@ def test_broken_registered_explainer_falls_through_to_unknown():
     whytrail.register(Bomb, boom)
     explanation = whytrail.why(Bomb())
     assert explanation.known is False
+
+
+def test_a_builtin_explainer_actually_registers_and_wins_over_tier_1():
+    """Regression guard for a real bug this project shipped and caught
+    within the same session: _load_builtin_explainers() silently
+    swallowed a NameError via its own `except Exception: continue`
+    (a deliberately broad catch for a *missing extra*, not for a typo
+    in registry.py itself), so every built-in explainer quietly
+    stopped registering and every plugin_contract test still needed a
+    real, separately-installed library to catch it. `requests` is a
+    real dev dependency here, so this exercises the actual
+    import-and-register path end to end, not a mock of it."""
+    import requests
+
+    try:
+        raise requests.exceptions.RequestException("boom")
+    except requests.exceptions.RequestException as exc:
+        explanation = whytrail.why(exc)
+    # requests' own explainer adds method/URL detail Tier 1 can't --
+    # if this ever reads like a bare Tier 1 "RequestException: boom"
+    # again, the builtin-explainer load path is broken again.
+    assert "raised as RequestException" in explanation.text
+
+
+def test_list_builtin_plugins_reports_a_real_dev_dependency_as_available():
+    statuses = registry.list_builtin_plugins()
+    by_name = {p.name: p for p in statuses}
+    assert by_name["requests"].available is True
+    assert all(p.kind == "explainer" for p in statuses)
+
+
+def test_list_builtin_plugins_reports_a_never_installed_library_as_unavailable():
+    statuses = registry.list_builtin_plugins()
+    by_name = {p.name: p for p in statuses}
+    assert by_name["zeep"].available is False  # not a dev dependency of this project
+
+
+def test_list_hook_based_plugins_covers_the_non_explainer_integrations():
+    statuses = registry.list_hook_based_plugins()
+    names = {p.name for p in statuses}
+    assert "fastapi" in names
+    assert "django" in names
+    assert all(p.kind == "integration" for p in statuses)
+    # the two lists partition the 63 integrations, not overlap with each other
+    assert names.isdisjoint({p.name for p in registry.list_builtin_plugins()})
+
+
+def test_every_hook_based_integration_has_an_underlying_import_mapped():
+    # Prevents a future integration from being added to
+    # _HOOK_BASED_INTEGRATIONS without a matching entry in
+    # _HOOK_BASED_UNDERLYING_IMPORT, which would KeyError inside
+    # list_hook_based_plugins() the moment it's called.
+    assert set(registry._HOOK_BASED_INTEGRATIONS) == set(registry._HOOK_BASED_UNDERLYING_IMPORT)
+
+
+def test_list_hook_based_plugins_does_not_trust_the_wrapper_module_alone(monkeypatch):
+    # bugsnag.py (like several other hook-based integrations) imports its
+    # real dependency lazily inside a function body, so
+    # `whytrail.integrations.bugsnag` itself imports cleanly whether or
+    # not the real `bugsnag` package is installed. availability must be
+    # keyed off the real underlying import, not the wrapper module --
+    # simulated here by pointing the mapping at a package that can never
+    # exist, independent of whether the real `bugsnag` happens to be
+    # installed in this dev environment.
+    monkeypatch.setitem(registry._HOOK_BASED_UNDERLYING_IMPORT, "bugsnag", "definitely_not_a_real_package_xyz")
+    statuses = registry.list_hook_based_plugins()
+    by_name = {p.name: p for p in statuses}
+    assert by_name["bugsnag"].available is False
+
+
+def test_list_entry_point_plugins_returns_a_sorted_list_of_names():
+    names = registry.list_entry_point_plugins()
+    assert names == sorted(names)

@@ -1,6 +1,17 @@
-"""Python tells you where. whytrail tells you why.
+"""Python tells you where. whytrail tells you why a value is the way it is.
 
-Two tiers, one entry point (ADR §02, §05):
+Fastest way to see it: `whytrail.install()` (ADR 0009) replaces
+sys.excepthook/threading.excepthook so every uncaught exception in the
+process prints why() first, then the original traceback, unchanged.
+Two lines, no other setup -- the flagship entry point this package is
+built around.
+
+The core (Node/Edge/Explanation, the type registry, the __why__
+protocol) is a general causal-explanation engine: a typed provenance
+graph plus a resolution order, keyed on "what type is this" rather than
+anything exception-specific (ADR 0007). Exceptions and tracked values
+are its first two consumers, both answering through one entry point
+(ADR §02, §05):
 
   Tier 1 -- zero configuration. why(some_exception) reassembles a
   causal chain from data CPython already retains: __traceback__,
@@ -10,8 +21,8 @@ Two tiers, one entry point (ADR §02, §05):
   provenance graph built only for values a developer deliberately
   watched with track(), @tracked, or trace().
 
-Both answer through why(). Something that was never tracked gets an
-honest "unknown," never a fabricated answer -- see ADR §11.
+Something that was never tracked gets an honest "unknown," never a
+fabricated answer -- see ADR §11.
 """
 
 from __future__ import annotations
@@ -23,23 +34,40 @@ from .core import serialize as _serialize
 from .core.explanation import Explanation, ExplanationStep
 from .core.graph import ProvenanceGraph
 from .core.node import Confidence, Edge, Node
+from .core.serialize import SnapshotVersionError
 from .explainers.builtin import explain_exception
+from .hook import install, uninstall
 from .protocols import call_why_protocol
 from .registry import coerce, register, register_from_plugin, resolve_explainer
 from .runtime.capture import track, tracked
 from .runtime.context import current_scope, default_graph, trace
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
-# Deliberately small: five verbs, two persistence helpers, and the two
-# names every explainer author touches (Explanation, ExplanationStep,
-# Confidence). Everything else a plugin author or advanced user needs
-# -- ProvenanceGraph, TraceScope, SupportsWhy, NodeKind, EdgeKind, the
-# raw Node/Edge types -- is one submodule import away
-# (whytrail.core.graph, whytrail.runtime.context, whytrail.protocols,
-# whytrail.core.node) rather than crowding `import whytrail; whytrail.<tab>`
-# for the median user who only ever calls why(). See the strategy
-# review's namespace audit.
+# Deliberately small: five verbs, two persistence helpers plus the one
+# exception they can raise (SnapshotVersionError -- added 0.3, found
+# auditing for consistency: whytrail.config.ConfigError already lives
+# alongside the function that raises it, config.env(), but
+# SnapshotVersionError didn't live alongside snapshot()/restore() --
+# it was two levels deeper in whytrail.core.serialize despite those
+# two functions being part of this same top-level surface. Co-located
+# here instead of moving snapshot()/restore() down, since demoting
+# already-public functions would be the actually-breaking direction),
+# and the two names every explainer author touches (Explanation,
+# ExplanationStep, Confidence). `install`/`uninstall` (0.3) are the one
+# deliberate exception to "everything else is one submodule import
+# away": the sys.excepthook/threading.excepthook installer is meant to
+# be the first thing shown in the README (the same role
+# rich.traceback.install() plays for Rich), and a defining feature
+# buried behind `from whytrail.hook import install` would undercut the
+# exact "install() and it just works" experience it exists to deliver.
+# Everything else a plugin author or advanced user needs --
+# ProvenanceGraph, TraceScope, SupportsWhy, NodeKind, EdgeKind, the raw
+# Node/Edge types -- is one submodule import away (whytrail.core.graph,
+# whytrail.runtime.context, whytrail.protocols, whytrail.core.node)
+# rather than crowding `import whytrail; whytrail.<tab>` for the median
+# user who only ever calls why(). See the strategy review's namespace
+# audit.
 __all__ = [
     "why",
     "track",
@@ -49,6 +77,9 @@ __all__ = [
     "register_from_plugin",
     "snapshot",
     "restore",
+    "install",
+    "uninstall",
+    "SnapshotVersionError",
     "Explanation",
     "ExplanationStep",
     "Confidence",
@@ -206,5 +237,9 @@ def restore(data: str) -> ProvenanceGraph:
     """Rebuild a read-only replay graph from a snapshot() (ADR §14).
     Replayed nodes carry their original metadata but, having outlived
     the process that captured them, behave as tombstones -- there is
-    no live object left to hold a weakref to."""
+    no live object left to hold a weakref to.
+
+    Raises SnapshotVersionError (available as `whytrail.SnapshotVersionError`,
+    the same module `restore` itself lives in) if `data` declares a
+    format version newer than this whytrail understands."""
     return _serialize.loads(data)

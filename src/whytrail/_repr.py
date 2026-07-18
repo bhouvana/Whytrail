@@ -21,6 +21,14 @@ _repr.maxset = 8
 
 
 def safe_repr(value: t.Any) -> str:
+    # Belt-and-suspenders, confirmed by a negative test (test_negative_inputs.py):
+    # reprlib.Repr already has its own internal fallback for an object
+    # whose __repr__ raises (or infinitely recurses, itself a
+    # RecursionError) -- repr_instance() catches it and returns
+    # "<ClassName instance at 0x...>" before this except clause ever
+    # sees it. This except still matters for anything reprlib's own
+    # dispatch doesn't route through repr_instance() (e.g. a container
+    # whose *contents* raise while reprlib is formatting them).
     try:
         return _repr.repr(value)
     except Exception:  # noqa: BLE001 - deliberately broad, see module docstring

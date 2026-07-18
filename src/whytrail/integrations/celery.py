@@ -39,10 +39,21 @@ def install(*, log_locals: bool = False, logger: logging.Logger | None = None) -
     """
     log = logger or _logger
 
-    @task_failure.connect(weak=False)
+    # Celery's own stub types signal.connect() loosely enough that mypy
+    # --strict considers anything it wraps "untyped" regardless of this
+    # function's own annotations -- a third-party stub limitation, not
+    # a gap in whytrail's own typing, silenced on the line below.
+    @task_failure.connect(weak=False)  # type: ignore[untyped-decorator]
     def _on_task_failure(  # noqa: ANN001 - Celery's signal signature
-        sender=None, task_id=None, exception=None, args=None, kwargs=None, traceback=None, einfo=None, **extra
-    ):
+        sender: t.Any = None,
+        task_id: t.Any = None,
+        exception: BaseException | None = None,
+        args: t.Any = None,
+        kwargs: t.Any = None,
+        traceback: t.Any = None,
+        einfo: t.Any = None,
+        **extra: t.Any,
+    ) -> None:
         if exception is None:
             return
         explanation = whytrail.why(exception)

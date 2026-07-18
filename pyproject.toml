@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "whytrail"
-version = "0.2.1"
-description = "Python tells you where. whytrail tells you why."
+version = "0.3.0"
+description = "Python tells you where. whytrail tells you why a value is the way it is."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -100,12 +100,16 @@ rollbar = ["rollbar>=1.0"]
 honeybadger = ["honeybadger>=0.15"]
 elastic-apm = ["elastic-apm>=6.15"]
 bugsnag = ["bugsnag>=4.5"]
+structlog = ["structlog>=23.0"]
+loguru = ["loguru>=0.7"]
+# stdlib `logging` needs no extra -- whytrail.integrations.logging has
+# no third-party dependency, only whytrail itself.
 
 # Every integration above in one install, for trying whytrail broadly or
 # CI matrices -- not meant as a typical user's default (see ADR 0006 for
 # why each stays its own extra instead of always installing everything).
 all = [
-    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sendgrid,websockets,opensearch,pyodbc,google-genai,oracledb,confluent-kafka,pymysql,pymssql,clickhouse,snowflake,graphql-core,tenacity,psycopg,cassandra,influxdb,pyzmq,zeep,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain,newrelic,rollbar,honeybadger,elastic-apm,bugsnag]",
+    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sendgrid,websockets,opensearch,pyodbc,google-genai,oracledb,confluent-kafka,pymysql,pymssql,clickhouse,snowflake,graphql-core,tenacity,psycopg,cassandra,influxdb,pyzmq,zeep,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain,newrelic,rollbar,honeybadger,elastic-apm,bugsnag,structlog,loguru]",
 ]
 
 dev = [
@@ -115,6 +119,17 @@ dev = [
     "hypothesis>=6.100",
     "rich>=13.0",
     "mypy>=1.10",
+    # click/jinja2: test-only tools for tests/integration/test_provenance_boundaries.py
+    # (ADR 0012's counterexample sweep) -- not whytrail integrations, no
+    # explainer plugin exists or is planned for either. Listed in dev
+    # rather than left to only ever run when a contributor happens to
+    # have them installed locally: without this, the core CI `test` job
+    # (which installs exactly `.[dev]`) would silently skip these tests
+    # via their own pytest.importorskip(), the same gap several
+    # pre-existing tests elsewhere in this suite already have.
+    "click>=8.0",
+    "jinja2>=3.0",
+    "ruff>=0.6",
 ]
 docs = [
     "mkdocs>=1.6",
@@ -194,3 +209,73 @@ ignore_missing_imports = true
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.ruff]
+# Matches requires-python above -- without this, ruff assumes its own
+# default target version and flags BaseExceptionGroup (3.11+) as an
+# undefined name in tests that already gate on Python 3.11+ features
+# correctly at runtime; this isn't a real error, just ruff not knowing
+# what version this project actually targets.
+target-version = "py310"
+# 130, not the more common 120/100: this codebase's narrative-style
+# comments and this file's own long guidance-string lookup tables
+# (_EXCEPTION_GLOSS/_EXCEPTION_FIXES) naturally run long, and forcing
+# every one to wrap would hurt readability for no real gain -- the
+# three lines that still exceeded even this were genuinely worth
+# reformatting and were fixed directly instead of raising the limit
+# further to dodge them.
+line-length = 130
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+# E741 (ambiguous variable names like `l`) is real and worth keeping on;
+# fixed at every site found rather than suppressed.
+
+[tool.mutmut]
+# Scoped to core/ deliberately, not the whole package: mutation testing
+# answers "does the test suite actually detect wrong behavior," which
+# matters most for the engine every other consumer (63 integrations,
+# the CLI, every renderer) sits on top of -- not "every module," which
+# would multiply runtime by 63 integrations' worth of mutants for a
+# question this scope already answers about the shared foundation.
+# mutmut has no native Windows support (requires WSL there, see its own
+# CLI message); this repo's CI runs on ubuntu-latest, where it works
+# directly with no translation needed.
+source_paths = ["src/whytrail/core"]
+# also_copy: mutmut copies only source_paths into an isolated mutants/
+# sandbox per run and mutates only those files -- but `import whytrail`
+# itself needs the rest of the top-level package's non-integration
+# modules to resolve (whytrail/__init__.py imports from _repr,
+# registry, protocols, hook, runtime/, explainers/). Listed here so
+# they're present (unmutated) in the sandbox, without inflating mutant
+# count with the 63 integrations/ modules or cli/, which aren't the
+# safety-critical shared engine this scope is about. Found by running
+# this for real: a first attempt with just source_paths="core" copied
+# an incomplete package and every test importing `whytrail` itself
+# failed at collection, not from a real bug.
+also_copy = [
+    "src/whytrail/__init__.py",
+    "src/whytrail/_repr.py",
+    "src/whytrail/registry.py",
+    "src/whytrail/protocols.py",
+    "src/whytrail/hook.py",
+    "src/whytrail/runtime",
+    "src/whytrail/explainers",
+]
+# -p no:whytrail: whytrail's own pytest11 entry point
+# (whytrail.integrations.pytest_plugin) auto-loads whenever pytest runs
+# with whytrail installed, regardless of source_paths/also_copy --
+# integrations/ genuinely isn't copied into the sandbox, so that
+# specific plugin can't import there. Disabling it for this run is
+# harmless: mutation testing doesn't need its failure-report
+# enhancement.
+pytest_add_cli_args = ["-p", "no:whytrail"]
+pytest_add_cli_args_test_selection = [
+    "tests/unit/test_graph.py",
+    "tests/unit/test_explanation.py",
+    "tests/unit/test_serialize.py",
+    "tests/unit/test_negative_inputs.py",
+    "tests/unit/test_chaos_and_recovery.py",
+    "tests/integration/test_graph_soak.py",
+    "tests/integration/test_stateful_graph.py",
+]

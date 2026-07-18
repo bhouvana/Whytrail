@@ -23,9 +23,22 @@ from whytrail import Confidence, Explanation, ExplanationStep
 from whytrail.registry import register_from_plugin
 
 
+def _safe_str(value: t.Any) -> str:
+    """requests' own `PreparedRequest.method`/`.url` are typed to allow
+    `bytes` (its `prepare_method()`/`prepare_url()` accept bytes input
+    from a caller before normalizing to `str`) -- confirmed by mypy
+    --strict flagging the bare f-string interpolation below
+    (str-bytes-safe: an f-string on a bytes value produces `"b'GET'"`,
+    not `"GET"`, which looks like a formatting bug even though it's
+    technically correct). By the time an exception reaches this
+    explainer that's normalized to `str` in every real case, but this
+    handles the type honestly instead of asserting it away."""
+    return value.decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)
+
+
 def _explain_response(response: "requests.Response") -> Explanation:
     request = response.request
-    method = request.method if request is not None else "?"
+    method = _safe_str(request.method) if request is not None else "?"
     steps = [
         ExplanationStep(
             description=f"{method} {response.url} -> {response.status_code} {response.reason}",
@@ -52,7 +65,7 @@ def _explain_request_exception(exc: "requests.exceptions.RequestException") -> E
     if request is not None:
         steps.append(
             ExplanationStep(
-                description=f"{request.method} {request.url} was sent",
+                description=f"{_safe_str(request.method)} {_safe_str(request.url)} was sent",
                 confidence=Confidence.EXPLICIT.value,
                 kind="external",
             )

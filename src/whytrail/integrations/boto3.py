@@ -20,7 +20,6 @@ Pydantic field value can.
 
 from __future__ import annotations
 
-import typing as t
 
 from botocore.exceptions import ClientError
 

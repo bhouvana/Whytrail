@@ -21,7 +21,6 @@ tests/plugin_contract/test_pymongo_plugin.py.
 
 from __future__ import annotations
 
-import typing as t
 
 import pymongo.errors
 

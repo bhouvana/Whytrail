@@ -10,7 +10,6 @@ from whytrail import otel  # noqa: E402
 
 @pytest.fixture()
 def recording_span():
-    from opentelemetry import trace
     from opentelemetry.sdk.trace import TracerProvider
 
     provider = TracerProvider()

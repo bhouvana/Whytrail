@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+
 import whytrail
-from whytrail.core.node import Confidence
 
 
 def test_untracked_value_is_honestly_unknown():
@@ -95,6 +96,145 @@ def test_tracked_decorator_links_arguments_to_raised_exception():
     # which is correct even though this exception also has a graph node
     explanation = whytrail.why(caught)
     assert "bad input: 99" in explanation.text
+
+
+def test_tracked_decorator_on_async_function_captures_the_awaited_result():
+    """Regression test for a real 0.3 bug: calling an async @tracked
+    function returns a coroutine immediately, so the old sync-only
+    wrapper tracked the coroutine object (never the awaited value) --
+    why() on the real result came back honestly-but-wrongly 'unknown'.
+    """
+
+    @whytrail.tracked
+    async def double(x):
+        await asyncio.sleep(0)
+        return x * 2
+
+    async def run():
+        with whytrail.trace():
+            return await double(21)
+
+    result = asyncio.run(run())
+    assert result == 42
+
+    explanation = whytrail.why(result)
+    assert explanation.known
+    descriptions = " ".join(step.description for step in explanation.steps)
+    assert "double(...)" in descriptions
+
+
+def test_tracked_decorator_on_async_function_links_arguments_to_raised_exception():
+    """The exception-linking branch was dead code for async functions
+    before the fix: calling a coroutine function doesn't run its body,
+    so the old wrapper's try/except around fn(*args, **kwargs) could
+    never observe an exception raised inside an async def."""
+
+    @whytrail.tracked
+    async def explode(x):
+        await asyncio.sleep(0)
+        raise ValueError(f"bad input: {x}")
+
+    async def run():
+        with whytrail.trace():
+            try:
+                await explode(99)
+            except ValueError as exc:
+                return exc
+
+    caught = asyncio.run(run())
+    explanation = whytrail.why(caught)
+    assert "bad input: 99" in explanation.text
+
+
+def test_tracked_decorator_on_async_function_outside_trace_scope_is_a_no_op():
+    calls = []
+
+    @whytrail.tracked
+    async def double(x):
+        calls.append(x)
+        return x * 2
+
+    result = asyncio.run(double(21))
+    assert result == 42
+    assert calls == [21]  # the function still ran normally
+    explanation = whytrail.why(result)
+    assert explanation.known is False  # but nothing was captured
+
+
+def test_tracked_decorator_on_generator_function_tracks_each_yielded_value():
+    """Regression test for the same class of 0.3 bug as the async
+    case: calling a generator function returns a generator object
+    immediately, so the old wrapper tracked the generator itself, not
+    the values it yields -- why() on a real yielded value came back
+    'unknown'."""
+
+    @whytrail.tracked
+    def double_each(items):
+        for item in items:
+            yield item * 2
+
+    with whytrail.trace():
+        results = list(double_each([1, 2, 3]))
+
+    assert results == [2, 4, 6]
+    explanation = whytrail.why(results[1])
+    assert explanation.known
+    descriptions = " ".join(step.description for step in explanation.steps)
+    assert "double_each(...)" in descriptions
+
+
+def test_tracked_decorator_on_generator_function_links_arguments_to_raised_exception():
+    @whytrail.tracked
+    def gen_fails(n):
+        for i in range(n):
+            if i == 2:
+                raise ValueError(f"bad item {i}")
+            yield i
+
+    with whytrail.trace():
+        collected = []
+        try:
+            for x in gen_fails(5):
+                collected.append(x)
+        except ValueError as exc:
+            caught = exc
+
+    assert collected == [0, 1]  # partial iteration before the raise
+    explanation = whytrail.why(caught)
+    assert "bad item 2" in explanation.text
+
+
+def test_tracked_decorator_on_generator_function_outside_trace_scope_is_a_no_op():
+    calls = []
+
+    @whytrail.tracked
+    def gen():
+        calls.append("ran")
+        yield [999001]  # a list, not a small cached int, for a reliable identity check
+        yield [999002]
+
+    results = list(gen())
+    assert calls == ["ran"]  # the generator still ran normally
+    assert whytrail.why(results[0]).known is False  # but nothing was captured
+
+
+def test_tracked_decorator_on_async_generator_function_tracks_each_yielded_value():
+    @whytrail.tracked
+    async def double_each(items):
+        for item in items:
+            await asyncio.sleep(0)
+            yield item * 2
+
+    async def run():
+        with whytrail.trace():
+            return [x async for x in double_each([1, 2, 3])]
+
+    results = asyncio.run(run())
+    assert results == [2, 4, 6]
+    explanation = whytrail.why(results[1])
+    assert explanation.known
+    descriptions = " ".join(step.description for step in explanation.steps)
+    assert "double_each(...)" in descriptions
 
 
 def test_trace_sample_rate_zero_disables_capture():

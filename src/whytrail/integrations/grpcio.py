@@ -13,7 +13,6 @@ this ecosystem (ADR 0002 §3 item 5). `.code()` (an enum, e.g.
 
 from __future__ import annotations
 
-import typing as t
 
 import grpc
 

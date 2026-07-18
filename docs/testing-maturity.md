@@ -1,11 +1,13 @@
 # Testing maturity: what's verified, what isn't
 
-This project has 369 tests across core whytrail and 60 bundled
+This project has 512 tests (499 passing plus 13 skipped for extras not
+installed in a given environment) across core whytrail and 63 bundled
 integrations (ADR 0006 -- extras of the one `whytrail` package, not
 separate distributions). Every plugin's tests run against a real object from the
 real library rather than a mock, a representative sample of the
 redaction-critical ones are now property-tested rather than
-spot-checked, and the safety-critical web middleware is verified under
+spot-checked, and the safety-critical web middleware, task-queue
+integrations, and observability integrations are all verified under
 real concurrent load. That's a meaningfully higher bar than "the code
 looks correct" -- it caught real bugs (see below), including twenty
 version-compatibility bugs across two rounds of finding them: an initial
@@ -17,6 +19,61 @@ to be, once something other than "does it install and import" was
 actually checked. It is still a different and smaller claim than "works
 in any condition," and this document exists so nobody mistakes one for
 the other.
+
+**A pass explicitly aimed at closing gaps #1, #2 (partially), and #3
+below** (rather than adding features) widened three things that were
+already checked for real elsewhere in this document, using the same
+mechanisms, not new ones: redaction property-fuzzing from 11 targets to
+22 (`tests/plugin_contract/test_redaction_fuzz.py`), concurrency testing
+from the three web frameworks to the task-queue and observability
+integrations (`test_task_queue_concurrency.py`,
+`test_observability_concurrency.py`), and the version-matrix's Python
+coverage from 3.13-only to 3.10-3.13
+(`plugin-version-matrix-py-range` in `ci.yml`, weekly-gated). Checking
+each candidate against real plugin source before writing a test found
+three named Phase I candidates (`boto3`, `aiohttp`, `marshmallow`) don't
+actually have a redaction-critical field to fuzz at all -- each
+plugin's own docstring already said so -- and caught two real bugs in
+the new tests themselves (a `requests.Response.text` charset-detection
+mismatch, and an `except ... as exc` variable-scoping bug in a
+hand-written test), both fixed the same way every other bug in this
+document was: the test failed first, then the cause was found.
+
+**A second pass aimed at the shared engine itself, not the plugin
+ecosystem** (`core/graph.py`, `core/serialize.py`, `core/explanation.py`,
+`why()`'s own implementation), found and fixed two real bugs in
+whytrail's own code, not just in tests: `core/graph.py`'s FIFO eviction
+never cleaned up `_object_to_node`/`_finalizers`, so either dict grew
+unboundedly whenever an evicted node's object was still alive (found by
+a 50,000-object soak test, `tests/integration/test_graph_soak.py`); and
+`core/serialize.py`'s `loads()` silently dropped any snapshot line with
+an unrecognized `"type"`, contradicting its own docstring (found by a
+negative test, `tests/unit/test_chaos_and_recovery.py`). Also added: a
+Hypothesis `RuleBasedStateMachine` running randomized track/why/
+snapshot/restore sequences (`tests/integration/test_stateful_graph.py`,
+which also found a real, previously-unverified serialize round-trip
+asymmetry, now documented directly in `core/serialize.py`); targeted
+fault injection at `why()`'s real internal call sites confirming its
+"never raises" promise (ADR §19) holds under `MemoryError`/
+`RecursionError`/`OSError`/`ImportError`/`PermissionError` and that its
+boundary is also correct (`KeyboardInterrupt`/`SystemExit` still
+propagate); an API-invariant battery of 15 pathological inputs; and a
+weekly, informational mutation-testing job (`mutmut`, scoped to
+`core/`) -- see `CHANGELOG.md` for the full account, including three
+real bugs found in this round's own test harness along the way (a
+`__slots__` class missing `"__weakref__"`, silently defeating its own
+weakref test; two fault-injection tests patching the wrong module
+reference and never actually firing their simulated fault until
+rewritten as `pytest.raises` checks that failed loudly instead of
+passing vacuously). Running mutation testing for the first time found
+450 mutants against `core/`, 128 surviving; investigating the
+highest-value ones (graph eviction bookkeeping, serialize round-trip
+field preservation) closed 8 of them with real regression tests and
+confirmed 2 more as equivalent mutants, not gaps. The remaining ~119,
+concentrated in `core/explanation.py`'s rendering helpers, are a real,
+named, uninvestigated remainder -- see gap #8 below and `CHANGELOG.md`
+for the full breakdown, rather than mechanically forcing a
+0-survivor count.
 
 ## What the current test suite actually verifies
 
@@ -33,13 +90,17 @@ the other.
 - **The safety-critical paths are verified against a known-sensitive
   value, not merely designed to look right**, for every plugin that
   touches something that could be sensitive (SQL params, validation
-  input, task payloads, response bodies) -- and, for nine of them, are
-  now **property-tested against ~40 generated values each (360 total)**
-  via Hypothesis (`tests/plugin_contract/test_redaction_fuzz.py`)
-  rather than one hand-picked string. Every generated value is first
-  confirmed present in the *unredacted* output before checking it's
-  absent from the redacted one -- proving the value was actually
-  captured, not that the check is vacuous.
+  input, task payloads, response bodies) -- and, for eleven of them
+  (nine Tier 1 exception explainers, plus `track()` and
+  `whytrail.config.env()` themselves since a 0.3 audit found
+  `Explanation.redacted()` had never been fuzzed against the Tier 2
+  path at all), are now **property-tested against ~40 generated values
+  each (440 total)** via Hypothesis
+  (`tests/plugin_contract/test_redaction_fuzz.py`) rather than one
+  hand-picked string. Every generated value is first confirmed present
+  in the *unredacted* output before checking it's absent from the
+  redacted one -- proving the value was actually captured, not that
+  the check is vacuous.
 - **The safety-critical web middleware holds under real concurrent
   load**: 30 simultaneous requests to FastAPI/Flask/Django, each
   carrying a unique secret, with `include_locals_in_response=True`
@@ -146,22 +207,45 @@ the other.
 
 ## What still isn't verified
 
-1. **Version compatibility beyond Python 3.13.** The version-matrix job
-   now covers all 60 plugins, but only against Python 3.13 -- 3.10/3.11/
-   3.12 floors are asserted in `pyproject.toml` but never installed and
-   checked the way 3.13's were, and the twenty bugs just found on 3.13
-   alone suggest that gap isn't hypothetical either.
+1. **Version compatibility beyond Python 3.13, partially closed.** A
+   new `plugin-version-matrix-py-range` job in `ci.yml` now installs
+   every extra's *original* `pyproject.toml`-stated floor (not the
+   3.13-corrected floor `plugin-version-matrix` pins) against Python
+   3.10/3.11/3.12 and runs its real contract test -- 186 jobs (62
+   extras x 3 versions). Deliberately weekly-`schedule`-gated rather
+   than on every push, the same cost/signal tradeoff `plugin-version-
+   matrix` itself already applies at 1x scale (see that job's own
+   comment and `docs/roadmap.md` Phase H). This closes the mechanism
+   gap, not the evidence gap: as of this writing the job has been
+   added but never actually executed on a real GitHub Actions runner
+   (it only fires on the Monday 06:00 UTC schedule or the next
+   `schedule` trigger) -- following this document's own standard, that
+   means "the check now exists," not "3.10-3.12 are confirmed working."
+   Update this item once the job has actually run.
 2. **The library's full exception surface.** Most plugins exercise one
    or two exception subtypes out of the library's real hierarchy --
    `whytrail-sqlalchemy` is tested only against SQLite's `IntegrityError`,
    not `OperationalError`/`ProgrammingError` or other DBAPI drivers;
    `whytrail-pydantic`'s fuzz coverage is one field (an int type
    mismatch), not nested models, discriminated unions, or custom
-   validators.
-3. **Concurrency beyond the three web frameworks.** The task-queue
-   plugins (Celery/RQ/dramatiq/Prefect) and Sentry/OTel/ddtrace capture
-   paths are not tested under concurrent load -- only FastAPI, Flask,
-   and Django are.
+   validators. Redaction-fuzz coverage specifically (a narrower claim
+   than "full exception surface") widened from 11 to 22 targets in the
+   same pass that closed item 1 above -- see this document's opening
+   note.
+3. **Concurrency beyond the three web frameworks, mostly closed.**
+   Celery, dramatiq, and RQ (`test_task_queue_concurrency.py`) and
+   Sentry, ddtrace, and OTel (`test_observability_concurrency.py`) are
+   now verified under real concurrent load, the same "N calls, each
+   carrying a unique secret, assert no cross-contamination" pattern
+   `test_web_concurrency.py` already established. Two real scope limits,
+   named rather than hidden: RQ's own concurrency model is
+   `os.fork()`-based process isolation (see item 5 below), so what's
+   actually tested there is whytrail's installed handler function
+   called concurrently, not RQ's real worker fleet; and Prefect is not
+   included at all -- `whytrail.integrations.prefect`'s own module
+   docstring already states it doesn't capture task arguments the way
+   the other three do, so there's no locals-bearing state for a
+   cross-contamination test to meaningfully exercise.
 4. **Scale and pathological input.** A validation error with hundreds
    of nested fields, a multi-gigabyte DataFrame, a malformed or huge SQL
    statement -- untested.
@@ -209,17 +293,38 @@ the other.
    longer waits for an unrelated push to this repo to surface -- but
    detection isn't the same as a policy for what happens next when one
    fires and nobody's actively working on that plugin.
+8. **~119 of 450 mutation-testing survivors against `core/`,
+   uninvestigated.** The first real run found 128 survivors; 8 were
+   real test gaps (fixed) and 2 were confirmed equivalent mutants, but
+   the remaining ~119 -- sampled, not exhaustively triaged, concentrated
+   in `core/explanation.py`'s rendering helpers -- were left as a named
+   remainder rather than mechanically chased to zero. Some of that
+   remainder is likely more equivalent mutants (confirmed for at least
+   one sampled case); some may be real, lower-value gaps in exact
+   string-formatting/styling decisions the existing behavioral tests
+   don't pin down. Neither has been established at scale yet.
 
 ## What closing the rest of this gap would require
 
-- **Extend the version matrix to the full Python range (3.10-3.13)**,
-  not just 3.13 -- every plugin is covered now, but only on the newest
-  supported interpreter.
-- **Extend property-based testing** to the plugins not yet covered
-  (grpcio, boto3, google-cloud, requests/httpx/aiohttp's body previews)
-  and to more of each already-covered library's exception surface, not
-  just one representative field/error type per plugin.
-- **Concurrency tests for the task-queue and observability plugins.**
+- **Watch the version-matrix's Python-range job actually run** on its
+  weekly schedule (or trigger it manually) and fold the result back
+  into item 1 above -- the mechanism exists now, the evidence doesn't
+  yet.
+- **Extend property-based testing** further, to more of each
+  already-covered library's exception surface (not just one
+  representative field/error type per plugin), and to `grpcio` if a
+  cheaper-than-a-real-server construction path is ever found. `boto3`,
+  `google-cloud`, and `requests`/`httpx`/`aiohttp`'s body previews are
+  no longer open items: checked directly against each plugin's own
+  source, `boto3` and `aiohttp` have no redaction-critical field to
+  fuzz at all (both plugins' own docstrings say so), `google-cloud`
+  was already covered, and `requests`/`httpx` are now covered too.
+- **Triage the remaining ~119 mutation-testing survivors** against
+  `core/explanation.py` in particular -- sample a wider set than the
+  two checked so far to establish whether the remainder skews toward
+  equivalent mutants (as both sampled cases did) or real, if low-value,
+  formatting-detail gaps, rather than guessing at the ratio from two
+  data points.
 - **Watch the next several CI runs, not just the first.** The first run
   found and fixed three real bugs; that's evidence the check is worth
   having, not evidence the workflow is now trustworthy -- confidence

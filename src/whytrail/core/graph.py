@@ -30,6 +30,12 @@ class ProvenanceGraph:
         self._edges_by_source: dict[int, list[Edge]] = collections.defaultdict(list)
         # id(obj) -> node id. Never holds a strong reference to obj itself.
         self._object_to_node: dict[int, int] = {}
+        # node id -> id(obj), the reverse of _object_to_node. Exists
+        # solely so _evict_if_needed() can remove the forward-mapping
+        # entry for an evicted node in O(1) instead of scanning
+        # _object_to_node for it -- see _evict_if_needed()'s own
+        # comment for why this matters.
+        self._node_to_object_key: dict[int, int] = {}
         # weakref.finalize isn't usefully genericizable here (its type
         # parameter tracks the finalized object's type, which varies
         # per call site) -- t.Any is the correct escape hatch, not a
@@ -77,6 +83,7 @@ class ProvenanceGraph:
     def _track_identity(self, obj: t.Any, node_id: int) -> None:
         key = id(obj)
         self._object_to_node[key] = node_id
+        self._node_to_object_key[node_id] = key
         try:
             fin = weakref.finalize(obj, self._on_collected, key, node_id)
             # atexit is a real, documented, settable property on
@@ -95,17 +102,42 @@ class ProvenanceGraph:
         with self._lock:
             if self._object_to_node.get(key) == node_id:
                 del self._object_to_node[key]
+            self._node_to_object_key.pop(node_id, None)
             node = self._nodes.get(node_id)
             if node is not None:
                 node.tombstone()
             self._finalizers.pop(node_id, None)
 
     def _evict_if_needed(self) -> None:
+        # Real bug, found by a soak test (tests/integration/
+        # test_graph_soak.py): without the three lines below,
+        # _object_to_node and _finalizers grow unboundedly whenever an
+        # evicted node's object is still alive (kept by the caller) --
+        # max_nodes correctly capped _nodes itself, but did nothing for
+        # these two structures, defeating bounded-memory retention for
+        # any long-running process that keeps old tracked objects
+        # around after their nodes age out. _on_collected() above
+        # already tolerates these entries being absent (it's written
+        # defensively either way), so cleaning them up here is safe
+        # even though the object itself may still be alive and could,
+        # in principle, be tracked again later under a new node.
         while len(self._nodes) > self.max_nodes:
             oldest_id, _ = self._nodes.popitem(last=False)
             self._edges_by_target.pop(oldest_id, None)
             self._edges_by_source.pop(oldest_id, None)
             self._edges = [e for e in self._edges if oldest_id not in (e.source, e.target)]
+            key = self._node_to_object_key.pop(oldest_id, None)
+            if key is not None and self._object_to_node.get(key) == oldest_id:
+                del self._object_to_node[key]
+            finalizer = self._finalizers.pop(oldest_id, None)
+            if finalizer is not None:
+                # Cancel rather than merely discard our reference: the
+                # node is gone, so there's nothing left for the
+                # callback to tombstone, and canceling also releases
+                # weakref's own internal registration instead of
+                # leaving it to fire uselessly whenever the object is
+                # eventually garbage collected.
+                finalizer.detach()
 
     # -- reading -----------------------------------------------------------
 
@@ -118,6 +150,25 @@ class ProvenanceGraph:
 
     def get(self, node_id: int) -> Node | None:
         return self._nodes.get(node_id)
+
+    def all_nodes(self) -> list[Node]:
+        """Every node currently in the graph, insertion order. Added
+        for `whytrail inspect`/`whytrail diff` (0.3): summarizing or
+        comparing a whole snapshot needs to enumerate it, and nothing
+        public let a consumer do that before -- every existing reader
+        (`node_for`, `get`, `ancestors`) starts from a single known
+        node or object, not "give me everything." `core/serialize.py`
+        was the one place ADR 0008 named as allowed to reach into
+        `_nodes` directly; this closes that gap with a real accessor
+        instead of a second private-access exception."""
+        with self._lock:
+            return list(self._nodes.values())
+
+    def all_edges(self) -> list[Edge]:
+        """Every edge currently in the graph, insertion order. See
+        all_nodes() -- same reasoning, same new need."""
+        with self._lock:
+            return list(self._edges)
 
     def ancestors(self, node_id: int, *, max_depth: int = 8) -> tuple[list[Node], list[Edge]]:
         """Walk causal edges backward from node_id, breadth-first, bounded
@@ -141,6 +192,42 @@ class ProvenanceGraph:
                             if src is not None:
                                 visited_nodes[edge.source] = src
                                 next_frontier.append(edge.source)
+                frontier = next_frontier
+                depth += 1
+        return list(visited_nodes.values()), visited_edges
+
+    def descendants(self, node_id: int, *, max_depth: int = 8) -> tuple[list[Node], list[Edge]]:
+        """Walk edges forward from node_id -- "what does this value
+        affect," the mirror of ancestors()'s "why does this value
+        exist." Exact structural mirror of ancestors() (breadth-first,
+        max_depth-bounded, same visited-set cycle safety) walking
+        _edges_by_source instead of _edges_by_target -- confirmed by a
+        Phase U counterexample sweep (docs/adr/0012) to be pure
+        traversal over an index that already existed, introducing no
+        new NodeKind/EdgeKind or semantic concept. Named but
+        deliberately not built in docs/roadmap.md Phase F pending a
+        concrete consumer; the consumer turned out to be this same
+        sweep's own need to demonstrate one value affecting several
+        independent downstream consumers without calling why() on each
+        one separately."""
+        visited_nodes: dict[int, Node] = {}
+        visited_edges: list[Edge] = []
+        frontier = [node_id]
+        depth = 0
+        with self._lock:
+            start = self._nodes.get(node_id)
+            if start is not None:
+                visited_nodes[node_id] = start
+            while frontier and depth < max_depth:
+                next_frontier: list[int] = []
+                for nid in frontier:
+                    for edge in self._edges_by_source.get(nid, ()):
+                        visited_edges.append(edge)
+                        if edge.target not in visited_nodes:
+                            tgt = self._nodes.get(edge.target)
+                            if tgt is not None:
+                                visited_nodes[edge.target] = tgt
+                                next_frontier.append(edge.target)
                 frontier = next_frontier
                 depth += 1
         return list(visited_nodes.values()), visited_edges

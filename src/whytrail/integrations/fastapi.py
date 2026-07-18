@@ -17,12 +17,43 @@ from __future__ import annotations
 import logging
 import typing as t
 
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 import whytrail
 
 _logger = logging.getLogger("whytrail.fastapi")
+
+
+async def _explain_and_respond(
+    request: Request,
+    exc: Exception,
+    *,
+    debug: bool,
+    include_locals_in_response: bool,
+    log_locals: bool,
+    logger: logging.Logger,
+) -> JSONResponse:
+    explanation = whytrail.why(exc)
+
+    log_explanation = explanation if log_locals else explanation.redacted()
+    logger.error(
+        "unhandled exception on %s %s\n%s",
+        request.method,
+        request.url.path,
+        log_explanation.text,
+        exc_info=exc,
+    )
+
+    if not debug:
+        return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
+
+    response_explanation = explanation if include_locals_in_response else explanation.redacted()
+    return JSONResponse(
+        {"detail": "Internal Server Error", "why": response_explanation.json()},
+        status_code=500,
+    )
 
 
 def install(
@@ -34,6 +65,10 @@ def install(
     logger: logging.Logger | None = None,
 ) -> None:
     """Wire a global exception handler into a FastAPI/Starlette app.
+    The primary, recommended API -- `add_exception_handler` is what
+    FastAPI's own docs point to for catching unhandled exceptions.
+    `WhytrailMiddleware` below is the same behavior for apps that
+    prefer Starlette's `add_middleware()` convention instead.
 
         from whytrail.integrations import fastapi as whytrail_fastapi
 
@@ -60,24 +95,68 @@ def install(
     log = logger or _logger
 
     async def handler(request: Request, exc: Exception) -> JSONResponse:
-        explanation = whytrail.why(exc)
-
-        log_explanation = explanation if log_locals else explanation.redacted()
-        log.error(
-            "unhandled exception on %s %s\n%s",
-            request.method,
-            request.url.path,
-            log_explanation.text,
-            exc_info=exc,
-        )
-
-        if not debug:
-            return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
-
-        response_explanation = explanation if include_locals_in_response else explanation.redacted()
-        return JSONResponse(
-            {"detail": "Internal Server Error", "why": response_explanation.json()},
-            status_code=500,
+        return await _explain_and_respond(
+            request,
+            exc,
+            debug=debug,
+            include_locals_in_response=include_locals_in_response,
+            log_locals=log_locals,
+            logger=log,
         )
 
     app.add_exception_handler(Exception, handler)
+
+
+class WhytrailMiddleware(BaseHTTPMiddleware):
+    """Same behavior as install(), as `app.add_middleware()` instead
+    of `app.add_exception_handler()` -- for apps that already
+    standardize on the middleware convention for cross-cutting
+    concerns and would rather not mix the two registration styles.
+    Identical safe-by-default posture (see install()'s docstring for
+    the full reasoning): two separate opt-ins for response detail and
+    log detail, both off unless explicitly turned on.
+
+        from fastapi import FastAPI
+        from whytrail.integrations.fastapi import WhytrailMiddleware
+
+        app = FastAPI()
+        app.add_middleware(WhytrailMiddleware)                     # production-safe default
+        app.add_middleware(WhytrailMiddleware, debug=True)          # local dev
+
+    Middleware runs outside FastAPI's own routing/exception-handling
+    layer, not inside it -- for an unhandled exception this produces
+    the same response either way, but a middleware sits earlier in
+    the request pipeline than an exception handler does, which matters
+    if other middleware between this one and the route also needs to
+    observe the exception. install() is unaffected by that distinction
+    and stays the recommended default; this exists for the apps that
+    specifically asked for `add_middleware`.
+    """
+
+    def __init__(
+        self,
+        app: t.Any,
+        *,
+        debug: bool = False,
+        include_locals_in_response: bool = False,
+        log_locals: bool = False,
+        logger: logging.Logger | None = None,
+    ) -> None:
+        super().__init__(app)
+        self._debug = debug
+        self._include_locals_in_response = include_locals_in_response
+        self._log_locals = log_locals
+        self._logger = logger or _logger
+
+    async def dispatch(self, request: Request, call_next: t.Callable[[Request], t.Awaitable[Response]]) -> Response:
+        try:
+            return await call_next(request)
+        except Exception as exc:  # noqa: BLE001 - the whole point is to catch whatever the route raises
+            return await _explain_and_respond(
+                request,
+                exc,
+                debug=self._debug,
+                include_locals_in_response=self._include_locals_in_response,
+                log_locals=self._log_locals,
+                logger=self._logger,
+            )

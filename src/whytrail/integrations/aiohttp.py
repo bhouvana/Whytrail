@@ -12,7 +12,6 @@ this point in aiohttp's own design.
 
 from __future__ import annotations
 
-import typing as t
 
 import aiohttp
 

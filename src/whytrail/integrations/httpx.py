@@ -9,7 +9,6 @@ whytrail-requests and whytrail-openai/anthropic (ADR 0002 §3 item 5).
 
 from __future__ import annotations
 
-import typing as t
 
 import httpx
 

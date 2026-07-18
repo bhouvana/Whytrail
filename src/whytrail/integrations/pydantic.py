@@ -18,7 +18,6 @@ password, a token, a payment field.
 
 from __future__ import annotations
 
-import typing as t
 
 import pydantic
 

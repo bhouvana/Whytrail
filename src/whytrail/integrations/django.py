@@ -43,7 +43,7 @@ class WhytrailMiddleware:
     their own terminal.
     """
 
-    def __init__(self, get_response: t.Callable) -> None:
+    def __init__(self, get_response: t.Callable[[t.Any], t.Any]) -> None:
         self.get_response = get_response
         self.logger = _logger
 

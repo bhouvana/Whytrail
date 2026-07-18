@@ -15,7 +15,6 @@ response body (ADR 0002 §3 item 5).
 
 from __future__ import annotations
 
-import typing as t
 
 from huggingface_hub.errors import HfHubHTTPError
 

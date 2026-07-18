@@ -33,8 +33,15 @@ def _explain_stripe_error(exc: "stripe.StripeError") -> Explanation:
     detail_parts = []
     if exc.code:
         detail_parts.append(f"code={exc.code}")
-    if getattr(exc, "param", None):
-        detail_parts.append(f"param={exc.param}")
+    # getattr(), not exc.param directly: only some StripeError subclasses
+    # (CardError, InvalidRequestError) actually declare .param -- the
+    # base class this explainer is registered against doesn't. Reusing
+    # the fetched value (rather than re-accessing exc.param in the
+    # f-string below) is also what makes this type-check cleanly under
+    # mypy --strict instead of asserting a type mypy can't verify.
+    param = getattr(exc, "param", None)
+    if param:
+        detail_parts.append(f"param={param}")
     if exc.http_status:
         detail_parts.append(f"http_status={exc.http_status}")
     body_locals = {"json_body": repr(exc.json_body)} if exc.json_body is not None else None

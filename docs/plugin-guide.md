@@ -245,8 +245,9 @@ a security-relevant integration needs to clear.
 
 ## The integrations that exist today
 
-60, all bundled (ADR 0006) -- the original target this ecosystem push
-was scoped against, reached (see `CHANGELOG.md` for batch-by-batch
+63, all bundled (ADR 0006) -- 60 reached the original target this
+ecosystem push was scoped against, plus logging/structlog/loguru
+since (see `CHANGELOG.md` for batch-by-batch
 progress and ADR 0003 for whether that number should keep growing or
 this is a natural resting point). Each earns its place by clearing one of the
 three bars in ADR 0003, verified against real objects, not assumed from
@@ -319,6 +320,9 @@ carry no structured data beyond what tier 1 already shows for free.
 | [`honeybadger`](../src/whytrail/integrations/honeybadger.py) | integration | Attaches explanations to Honeybadger notifications via `notify()` |
 | [`elastic-apm`](../src/whytrail/integrations/elastic_apm.py) | integration | Attaches explanations to Elastic APM error events via `capture_exception()` |
 | [`bugsnag`](../src/whytrail/integrations/bugsnag.py) | integration | Attaches explanations to Bugsnag reports via `notify()` |
+| [`logging`](../src/whytrail/integrations/logging.py) (core module, no extra needed) | integration | A `logging.Filter` appending explanations to any record with `exc_info` |
+| [`structlog`](../src/whytrail/integrations/structlog.py) | integration | A processor adding a structured `why` key to the event dict |
+| [`loguru`](../src/whytrail/integrations/loguru.py) | integration | `logger.patch()`-based, appends explanations to messages carrying exception info |
 
 † required `weak=False` on the signal connection -- the default weak
 reference let the handler closure get garbage-collected immediately

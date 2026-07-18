@@ -10,7 +10,6 @@ reason as whytrail-openai's: it can echo back request content.
 
 from __future__ import annotations
 
-import typing as t
 
 import anthropic
 

@@ -86,3 +86,67 @@ def test_successful_requests_are_unaffected():
     resp = client.get("/ok")
     assert resp.status_code == 200
     assert resp.json() == {"status": "fine"}
+
+
+def _make_middleware_app(**middleware_kwargs):
+    app = FastAPI()
+    app.add_middleware(whytrail_fastapi.WhytrailMiddleware, **middleware_kwargs)
+
+    @app.get("/boom")
+    def boom():
+        api_key = SECRET  # noqa: F841
+        raise ValueError("payment failed")
+
+    @app.get("/ok")
+    def ok():
+        return {"status": "fine"}
+
+    return app
+
+
+def test_middleware_production_default_response_has_no_explanation_at_all():
+    client = TestClient(_make_middleware_app(), raise_server_exceptions=False)
+    resp = client.get("/boom")
+    assert resp.status_code == 500
+    assert resp.json() == {"detail": "Internal Server Error"}
+    assert SECRET not in resp.text
+    assert "ValueError" not in resp.text
+
+
+def test_middleware_debug_true_includes_explanation_but_still_redacts_locals():
+    client = TestClient(_make_middleware_app(debug=True), raise_server_exceptions=False)
+    resp = client.get("/boom")
+    assert resp.status_code == 500
+    body = resp.json()
+    assert "why" in body
+    assert "payment failed" in str(body)
+    assert SECRET not in resp.text
+
+
+def test_middleware_debug_true_and_include_locals_in_response_true_is_the_only_way_to_leak():
+    client = TestClient(
+        _make_middleware_app(debug=True, include_locals_in_response=True), raise_server_exceptions=False
+    )
+    resp = client.get("/boom")
+    assert SECRET in resp.text  # only reachable via two explicit, separate opt-ins
+
+
+def test_middleware_successful_requests_are_unaffected():
+    client = TestClient(_make_middleware_app())
+    resp = client.get("/ok")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "fine"}
+
+
+def test_install_and_middleware_produce_the_same_response_shape():
+    """The two registration styles (add_exception_handler vs
+    add_middleware) share _explain_and_respond -- this pins that they
+    stay behaviorally identical, not just independently correct."""
+    handler_client = TestClient(_make_app(debug=True), raise_server_exceptions=False)
+    middleware_client = TestClient(_make_middleware_app(debug=True), raise_server_exceptions=False)
+
+    handler_body = handler_client.get("/boom").json()
+    middleware_body = middleware_client.get("/boom").json()
+
+    assert handler_body["why"]["subject"] == middleware_body["why"]["subject"]
+    assert handler_body["detail"] == middleware_body["detail"]

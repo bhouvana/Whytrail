@@ -11,11 +11,16 @@ regardless of which happens first -- see register() vs register_from_plugin().
 
 from __future__ import annotations
 
-import importlib.metadata
+import dataclasses
+import importlib
+import sys
 import typing as t
 
 from ._repr import safe_repr
 from .core.explanation import Explanation, ExplanationStep
+
+if t.TYPE_CHECKING:
+    import importlib.metadata
 
 Explainer = t.Callable[[t.Any], t.Union[Explanation, str, None]]
 
@@ -97,6 +102,138 @@ _BUILTIN_EXPLAINERS = (
     "zeep",
 )
 
+# The remaining 20 of the 63 total integrations: hook/middleware/signal
+# -based (fastapi, django, celery, ...). These never auto-register --
+# ADR 0006 -- so they're listed separately from _BUILTIN_EXPLAINERS
+# above, purely for `whytrail plugins`' introspection below; nothing
+# else in the registry reads this tuple.
+_HOOK_BASED_INTEGRATIONS = (
+    "bugsnag",
+    "celery",
+    "ddtrace",
+    "django",
+    "dramatiq",
+    "elastic_apm",
+    "fastapi",
+    "flask",
+    "honeybadger",
+    "langchain",
+    "logging",
+    "loguru",
+    "newrelic",
+    "prefect",
+    "pytest_plugin",
+    "rollbar",
+    "rq",
+    "scrapy",
+    "sentry",
+    "structlog",
+)
+
+# The real top-level import for the underlying third-party library each
+# hook-based integration wraps. list_hook_based_plugins() checks this
+# import directly instead of trusting "whytrail.integrations.<name>
+# imports cleanly" the way _BUILTIN_EXPLAINERS' check does above --
+# several of these modules (bugsnag, ddtrace, elastic_apm, flask,
+# honeybadger, newrelic, rollbar, rq, scrapy, sentry) import their real
+# dependency lazily inside a function body rather than at module top
+# level, and prefect never imports it at all (pure duck typing over
+# whatever object Prefect's hook signature passes). That means the
+# wrapper module imports without error whether or not the real library
+# is installed, so it can't be used as the availability signal. Found
+# via a clean-venv smoke test: `whytrail plugins` reported these as
+# "available" with zero of their third-party packages present.
+_HOOK_BASED_UNDERLYING_IMPORT: dict[str, str] = {
+    "bugsnag": "bugsnag",
+    "celery": "celery",
+    "ddtrace": "ddtrace",
+    "django": "django",
+    "dramatiq": "dramatiq",
+    "elastic_apm": "elasticapm",
+    "fastapi": "starlette",
+    "flask": "flask",
+    "honeybadger": "honeybadger",
+    "langchain": "langchain_core",
+    "logging": "logging",
+    "loguru": "loguru",
+    "newrelic": "newrelic",
+    "prefect": "prefect",
+    "pytest_plugin": "pytest",
+    "rollbar": "rollbar",
+    "rq": "rq",
+    "scrapy": "scrapy",
+    "sentry": "sentry_sdk",
+    "structlog": "structlog",
+}
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class PluginStatus:
+    """One row of `whytrail plugins`' output -- not part of the
+    registry's own resolution logic, purely a read-only introspection
+    view over it."""
+
+    name: str
+    # "explainer" (auto-registers on import) or "integration" (needs
+    # explicit install()/wiring) -- matches docs/plugin-guide.md's own
+    # "Shape" column vocabulary exactly (a first version of this used
+    # "hook" instead, a third term for the same two-shape taxonomy
+    # already established there and in pyproject.toml's own "Integration
+    # -shaped" extras comment; found auditing for naming consistency
+    # before 1.0, since this is a public JSON field via `whytrail
+    # plugins --json` and would be expensive to rename once real
+    # scripts depend on it).
+    kind: str
+    available: bool  # underlying third-party library is importable
+
+
+def list_builtin_plugins() -> list[PluginStatus]:
+    """Status of every explainer-shaped extra bundled in this package
+    (auto-registers via why() the moment its extra is installed --
+    see _load_builtin_explainers()). Calling this triggers that same
+    lazy load if it hasn't happened yet, so `available` reflects
+    reality rather than "not checked yet.\""""
+    _load_builtin_explainers()
+    return [
+        PluginStatus(name=name, kind="explainer", available=f"whytrail.integrations.{name}" in sys.modules)
+        for name in _BUILTIN_EXPLAINERS
+    ]
+
+
+def list_hook_based_plugins() -> list[PluginStatus]:
+    """Status of every hook/middleware-based integration bundled in
+    this package. These never auto-register (ADR 0006 -- they need an
+    explicit install()/wiring call in user code), so `available` here
+    means only "the underlying library is importable," not "currently
+    wired into an app." Verified via _HOOK_BASED_UNDERLYING_IMPORT's
+    real package name, not merely by importing whytrail's own wrapper
+    module -- see that mapping's comment for why the wrapper import
+    alone isn't a reliable signal.
+    """
+    statuses = []
+    for name in _HOOK_BASED_INTEGRATIONS:
+        try:
+            importlib.import_module(f"whytrail.integrations.{name}")
+            importlib.import_module(_HOOK_BASED_UNDERLYING_IMPORT[name])
+            available = True
+        except Exception:  # noqa: BLE001 - missing extra, either way just report unavailable
+            available = False
+        statuses.append(PluginStatus(name=name, kind="integration", available=available))
+    return statuses
+
+
+def list_entry_point_plugins() -> list[str]:
+    """Names of external plugins discovered via the whytrail.explainers
+    entry-point group -- installed as separate packages, not bundled
+    in this repo (ADR §06)."""
+    import importlib.metadata
+
+    try:
+        eps = importlib.metadata.entry_points(group=ENTRY_POINT_GROUP)
+    except Exception:  # noqa: BLE001 - a broken environment must not break this either
+        return []
+    return sorted(ep.name for ep in eps)
+
 
 def register(type_: type, explainer: Explainer) -> None:
     """Public, user-facing registration. Always takes precedence over
@@ -128,6 +265,8 @@ def _load_entry_points() -> None:
     if _entry_points_loaded:
         return
     _entry_points_loaded = True
+    import importlib.metadata  # lazy: ~30ms of this module's own import cost
+
     try:
         eps = importlib.metadata.entry_points(group=ENTRY_POINT_GROUP)
     except Exception:  # noqa: BLE001 - a broken environment must not break why()

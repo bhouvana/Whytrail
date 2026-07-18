@@ -11,7 +11,6 @@ works on any exception whytrail has never seen before -- this is the
 from __future__ import annotations
 
 import types
-import typing as t
 
 from .._repr import safe_repr
 from ..core.explanation import Explanation, ExplanationStep
@@ -110,10 +109,8 @@ def _causal_chain(
     while len(items) < max_depth:
         if current.__cause__ is not None:
             nxt: BaseException | None = current.__cause__
-            relation = "explicit"
         elif current.__context__ is not None and not current.__suppress_context__:
             nxt = current.__context__
-            relation = "implicit"
         else:
             break
         if nxt is None or id(nxt) in seen:

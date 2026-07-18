@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-import whytrail
 from whytrail import registry
 from whytrail.runtime.context import default_graph
 

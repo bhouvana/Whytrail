@@ -68,3 +68,45 @@ def test_passing_tests_have_no_whytrail_section(pytester):
     result = pytester.runpytest()
     output = "\n".join(result.outlines)
     assert "----------------------------------- whytrail" not in output
+
+
+TRACKED_VALUE_FAILING_TEST = """
+import whytrail
+
+def test_price_calculation():
+    with whytrail.trace():
+        raw = whytrail.track({"price": "12.50"}, label="raw CSV row")
+        price = whytrail.track(float(raw["price"]), derived_from=raw)
+        assert price == 999
+"""
+
+
+def test_tracked_locals_at_the_failing_assertion_are_surfaced(pytester):
+    """Tier 1 alone (what the section already showed before 0.3) only
+    explains "AssertionError at this line" -- never where `price`
+    itself came from. This is the actual gap whytrail-pytest had:
+    fixed by surfacing each track()ed local's own why() alongside the
+    exception explanation, not by building a second plugin."""
+    pytester.makepyfile(TRACKED_VALUE_FAILING_TEST)
+    result = pytester.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.fnmatch_lines(["*'price' was separately track()ed*", "*raw CSV row*"])
+
+
+def test_no_whytrail_flag_also_suppresses_tracked_locals_section(pytester):
+    pytester.makepyfile(TRACKED_VALUE_FAILING_TEST)
+    result = pytester.runpytest("--no-whytrail")
+    result.assert_outcomes(failed=1)
+    output = "\n".join(result.outlines)
+    assert "was separately track()ed" not in output
+
+
+def test_untracked_assertion_failure_has_no_tracked_locals_section(pytester):
+    """The common case (nothing in the test used track()) must not
+    grow a section that says nothing -- absence, not an empty
+    "nothing was tracked" note, matching how why() itself stays silent
+    rather than padding output for information it doesn't have."""
+    pytester.makepyfile(FAILING_TEST)
+    result = pytester.runpytest()
+    output = "\n".join(result.outlines)
+    assert "was separately track()ed" not in output

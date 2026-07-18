@@ -13,7 +13,12 @@ import pytest
 django = pytest.importorskip("django")
 pytest.importorskip("whytrail.integrations.django")
 
-import django.conf  # noqa: E402
+# noqa: E402 (import after importorskip), F811 (ruff sees this as
+# redefining the `django` name importorskip() already bound -- it
+# isn't unused, `django.conf.settings` right below needs `django.conf`
+# to actually be imported as a submodule first, which importorskip()
+# alone doesn't guarantee)
+import django.conf  # noqa: E402, F811
 
 if not django.conf.settings.configured:
     django.conf.settings.configure(DEBUG=False, ALLOWED_HOSTS=["testserver"])

@@ -14,7 +14,6 @@ process boundary unredacted by default.
 
 from __future__ import annotations
 
-import typing as t
 
 import openai
 

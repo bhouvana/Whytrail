@@ -20,7 +20,6 @@ for the same reason as grpc's `.details()`.
 
 from __future__ import annotations
 
-import typing as t
 
 from google.api_core.exceptions import GoogleAPICallError
 

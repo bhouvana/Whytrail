@@ -16,3 +16,6 @@ htmlcov/
 site/
 .claude/
 .playwright-mcp/
+.benchmarks/
+mutants/
+.mutmut-cache

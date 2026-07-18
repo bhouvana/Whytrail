@@ -42,8 +42,12 @@ def install(
     """
     log = logger or _logger
 
-    @app.errorhandler(Exception)
-    def _handler(exc: Exception):
+    # Flask's own stub types app.errorhandler() loosely enough that
+    # mypy --strict considers anything it wraps "untyped" regardless of
+    # this function's own annotations -- a third-party stub limitation,
+    # not a gap in whytrail's own typing, silenced on the line below.
+    @app.errorhandler(Exception)  # type: ignore[untyped-decorator]
+    def _handler(exc: Exception) -> tuple[t.Any, int]:
         from flask import jsonify, request
 
         explanation = whytrail.why(exc)

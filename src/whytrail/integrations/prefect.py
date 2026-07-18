@@ -26,7 +26,7 @@ import whytrail
 _logger = logging.getLogger("whytrail.prefect")
 
 
-def on_failure_hook(logger: logging.Logger | None = None) -> t.Callable:
+def on_failure_hook(logger: logging.Logger | None = None) -> t.Callable[[t.Any, t.Any, t.Any], None]:
     """Returns a hook usable directly in `on_failure=[...]`.
 
         from whytrail.integrations.prefect import on_failure_hook

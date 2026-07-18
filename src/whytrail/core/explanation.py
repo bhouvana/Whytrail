@@ -4,15 +4,28 @@ renderings (ADR §05)."""
 from __future__ import annotations
 
 import dataclasses
+import html
 import re
 import typing as t
 
-from .node import Confidence, Edge, Node
+from .node import Confidence, Edge, Node, NodeKind
 
 _STYLES = {
     Confidence.EXPLICIT.value: "bold",
     Confidence.INFERRED.value: "yellow",
     Confidence.HEURISTIC.value: "dim yellow",
+}
+
+# Dark-on-light-safe colors for _repr_html_ -- Jupyter's own theme
+# varies (classic light, JupyterLab dark, VS Code notebooks each pick
+# their own background), so these avoid anything that disappears
+# against a plausible background either way, same reasoning ADR 0002
+# SS3 item 2 already applied to the terminal confidence markers.
+_HTML_CONFIDENCE_COLOR = {
+    "explicit": "#2e7d32",
+    "inferred": "#b8860b",
+    "heuristic": "#b8860b",
+    "unknown": "#888888",
 }
 
 # Plain-English glosses for common builtin exceptions, used only by
@@ -101,7 +114,10 @@ _EXCEPTION_FIXES = {
     "ImportError": "check the package is installed (`pip install <package>`) and the import path is correct",
     "ModuleNotFoundError": "install the missing package (`pip install <package>`), or check for a typo in the import",
     "NotImplementedError": "this code path is intentionally unfinished -- implement it, or avoid triggering it",
-    "RecursionError": "check for a missing base case in a recursive function, or increase sys.setrecursionlimit() if the recursion is legitimate",
+    "RecursionError": (
+        "check for a missing base case in a recursive function, or increase "
+        "sys.setrecursionlimit() if the recursion is legitimate"
+    ),
     "MemoryError": "process data in smaller chunks, or check for something growing unbounded",
     "OverflowError": "use a data type that can hold larger numbers, or check for a runaway calculation",
     "StopIteration": "check the iterator/generator actually has as many items as expected",
@@ -114,7 +130,9 @@ _EXCEPTION_FIXES = {
     "ExpiredSignatureError": "the token needs to be refreshed/reissued -- check the client's refresh flow, not just this request",
     "InvalidAudienceError": "check the token was actually issued for this service, and that the `audience` check matches",
     "InvalidIssuerError": "check the token came from the issuer this code expects, and that the `issuer` check matches",
-    "InvalidSignatureError": "check both sides are using the same signing key/algorithm, and that the token wasn't modified in transit",
+    "InvalidSignatureError": (
+        "check both sides are using the same signing key/algorithm, and that the token wasn't modified in transit"
+    ),
     "InvalidTokenError": "inspect the token's claims and compare against what the validator expects (audience, issuer, expiry)",
     "DecodeError": "check the token wasn't truncated or corrupted before it reached the decoder",
     "InvalidToken": "check the same key used to encrypt is being used to decrypt, and that the data wasn't modified",
@@ -261,9 +279,28 @@ class Explanation:
             f"confidence={_confidence_label(self.confidence)} tracked={self.tracked}>"
         )
 
-    def rich(self) -> t.Any:
-        """Render as a rich.tree.Tree. Requires the 'rich' extra."""
+    def rich(self, *, panel: bool = False) -> t.Any:
+        """Render as a rich.tree.Tree (the same return type as before
+        0.3, so existing callers doing tree.add(...) or embedding it in
+        their own layout keep working unchanged), or -- with
+        panel=True -- a rich.panel.Panel wrapping one. Requires the
+        'rich' extra.
+
+        Two upgrades over the plain-text-label version:
+        - A step's locals render as a rich.table.Table (name/value
+          columns) instead of one flat string, nested as the step's
+          own tree child -- more readable for more than a couple of
+          locals, and each value gets its own cell rather than being
+          squeezed into a single line.
+        - A step's file:line location renders as a best-effort
+          clickable `file://` link. Terminal support for this varies
+          (VS Code's integrated terminal, iTerm2, and Windows Terminal
+          honor it; not every terminal does) -- degrades to plain,
+          identical-looking text where it isn't supported, never
+          worse than the text it replaces.
+        """
         try:
+            from rich.table import Table
             from rich.text import Text
             from rich.tree import Tree
         except ImportError as exc:  # pragma: no cover - exercised via extras test
@@ -274,15 +311,24 @@ class Explanation:
         tree = Tree(f"why({self.subject})")
         if not self.steps:
             tree.add(Text("unknown -- no provenance captured", style="dim italic"))
-            return tree
-        for step in self.steps:
-            label = Text(step.description, style=_confidence_style(step.confidence))
-            if step.location:
-                label.append(f"  {step.location}", style="dim")
-            label.append(f"  ({_confidence_label(step.confidence)})", style="dim italic")
-            if step.locals:
-                label.append(f"\n      locals: {_format_locals(step.locals)}", style="dim")
-            tree.add(label)
+        else:
+            for step in self.steps:
+                label = Text(step.description, style=_confidence_style(step.confidence))
+                if step.location:
+                    label.append("  ")
+                    label.append(_location_link(step.location))
+                label.append(f"  ({_confidence_label(step.confidence)})", style="dim italic")
+                node = tree.add(label)
+                if step.locals:
+                    node.add(_locals_table(step.locals, Table))
+
+        if panel:
+            from rich.panel import Panel
+
+            # No title here: the tree's own root already reads
+            # "why(subject)" -- a second copy in the panel's title
+            # would just repeat it.
+            return Panel(tree, border_style=_confidence_style(self.confidence))
         return tree
 
     def json(self) -> dict[str, t.Any]:
@@ -308,18 +354,86 @@ class Explanation:
             ],
         }
 
-    def redacted(self) -> "Explanation":
-        """A copy with every step's locals stripped -- the one-line
-        way for any integration that exports off-box (Sentry, OTel, a
-        CI comment, an HTTP error response) to get a safe-to-share
-        version. Everything else (description, location, confidence,
-        the causal chain itself) is preserved; only the raw local
-        variable values are dropped, since those are the one thing
-        that can plausibly contain a secret.
+    @classmethod
+    def from_json(cls, data: dict[str, t.Any]) -> "Explanation":
+        """The other direction of .json() -- rebuilds an Explanation
+        from a previously-serialized one (e.g. saved via `whytrail run
+        --json`), for the `whytrail explain` CLI command and any other
+        consumer that wants to re-render a captured explanation later
+        without re-running the code that produced it.
+
+        Reconstructs exactly what .json() actually stored: `subject`,
+        `tracked`, and `steps` (description/confidence/location/kind/
+        locals). `known` and `confidence` are derived properties, not
+        stored fields, and are recomputed automatically from `steps`.
+        `suggestion` is regenerated the same way .json() derives it,
+        not stored either. `nodes`/`edges` are not part of .json()'s
+        output (only `.graph()` -- a separate, string-shaped Mermaid
+        rendering -- captures those), so a round-tripped Explanation's
+        `.graph()` reflects the original honestly: empty for a Tier 1
+        exception (which never populated it either, per ADR 0008), and
+        for a Tier 2 answer, unavailable after the round trip -- never
+        fabricated to look like it survived when it didn't.
         """
+        steps = [
+            ExplanationStep(
+                description=step["description"],
+                confidence=step["confidence"],
+                location=step.get("location"),
+                kind=step.get("kind", "value"),
+                locals=step.get("locals"),
+            )
+            for step in data.get("steps", [])
+        ]
+        return cls(subject=data["subject"], steps=steps, tracked=data.get("tracked", True))
+
+    def redacted(self) -> "Explanation":
+        """A copy safe to export off-box (Sentry, OTel, a CI comment,
+        an HTTP error response). Strips three things, not one:
+
+        - Every step's `locals` (Tier 1's frame-locals capture).
+        - For a Tier 2 answer specifically (`.nodes` non-empty --
+          i.e. this came from `_explain_from_graph`'s graph traversal,
+          not a plugin's own `Explanation`): every `kind == "value"`
+          step's `description`, and every `NodeKind.VALUE` node's
+          `label`/`metadata` in `.nodes`. Found missing in a 0.3 audit:
+          `track()`'s node label defaults to the tracked value's own
+          `repr()` (see `runtime/capture.py`), so a locals-only
+          redaction left that value reachable through `.text`,
+          `.graph()`, and `.json()` for any tracked-value or config
+          chain. Gated on `.nodes` specifically, not on `kind` alone --
+          a first version of this fix redacted *every* `kind=="value"`
+          step regardless of origin and broke
+          `whytrail-pydantic`'s explainer, which already does its own
+          correct locals-only redaction and reuses `kind="value"` for
+          an unrelated, already-safe purpose (field name + error type,
+          never the bad input itself). Confirmed no bundled plugin
+          populates `.nodes`/`.edges` on its own `Explanation` --
+          that's exclusively `_explain_from_graph`'s territory -- so
+          this check reaches only the code path that actually has the
+          bug.
+        - `.subject` itself, under the same `.nodes`-non-empty gate --
+          `why()` sets `subject = safe_repr(obj)` for any Tier 2 answer
+          (see `_explain_from_graph`), so the "why(...)"  header line
+          was leaking the same raw value the fix above was just
+          closing everywhere else. Left alone for Tier 1 (an
+          exception's own type/message is the explanation, not
+          incidental capture) and for a genuinely unknown subject (no
+          chain was ever found).
+
+        All drops are wholesale, not selective -- the same tradeoff
+        `locals` redaction already made (a legitimate, non-sensitive
+        label is lost along with a sensitive one) in exchange for not
+        guessing at what's actually safe. Location, confidence, and
+        the causal chain's shape are preserved either way.
+        """
+        from_graph_traversal = bool(self.nodes)
+        subject = "[redacted]" if from_graph_traversal else self.subject
         return dataclasses.replace(
             self,
-            steps=[dataclasses.replace(step, locals=None) for step in self.steps],
+            subject=subject,
+            steps=[_redact_step(step, from_graph_traversal=from_graph_traversal) for step in self.steps],
+            nodes=[_redact_node(node) for node in self.nodes],
         )
 
     def graph(self) -> str:
@@ -336,13 +450,93 @@ class Explanation:
             lines.append(f"    N{edge.source} {arrow}|{edge.kind.value}| N{edge.target}")
         return "\n".join(lines)
 
+    def _repr_html_(self) -> str:
+        """Jupyter/IPython calls this automatically for the last
+        expression in a cell (`why(obj)` with no print() needed) --
+        pure stdlib string building, no `rich` or other extra
+        required, matching core's zero-required-dependencies contract.
+        Same content as `.text`, not new information: a styled
+        rendering of the same steps, confidence markers included as
+        color, not just the bracketed label.
+        """
+        if not self.steps:
+            return (
+                f'<div style="font-family:monospace">'
+                f"<b>why({_html_escape(self.subject)})</b>: "
+                f'<span style="color:#888">unknown -- no provenance captured</span></div>'
+            )
+        rows = []
+        for step in self.steps:
+            color = _HTML_CONFIDENCE_COLOR.get(_confidence_label(step.confidence), "#888")
+            loc = (
+                f' <span style="color:#888;font-size:0.9em">{_html_escape(step.location)}</span>'
+                if step.location
+                else ""
+            )
+            rows.append(
+                f'<li><span style="color:{color}">[{_confidence_label(step.confidence)}]</span> '
+                f"{_html_escape(step.description)}{loc}</li>"
+            )
+            if step.locals:
+                locals_html = ", ".join(
+                    f"<code>{_html_escape(name)}={_html_escape(value)}</code>" for name, value in step.locals.items()
+                )
+                rows.append(f'<li style="list-style:none;color:#888;font-size:0.9em">locals: {locals_html}</li>')
+        return (
+            f'<div style="font-family:monospace">'
+            f"<b>why({_html_escape(self.subject)})</b>"
+            f'<ul style="margin:4px 0">{"".join(rows)}</ul></div>'
+        )
+
 
 def _escape(label: str) -> str:
     return label.replace('"', "'").replace("\n", " ")
 
 
+def _html_escape(text: str) -> str:
+    return html.escape(text)
+
+
+def _redact_step(step: ExplanationStep, *, from_graph_traversal: bool) -> ExplanationStep:
+    redact_description = from_graph_traversal and step.kind == "value"
+    description = "value: [redacted]" if redact_description else step.description
+    return dataclasses.replace(step, description=description, locals=None)
+
+
+def _redact_node(node: Node) -> Node:
+    if node.kind is NodeKind.VALUE:
+        return dataclasses.replace(node, label="[redacted]", metadata={})
+    if node.metadata:
+        return dataclasses.replace(node, metadata={})
+    return node
+
+
 def _format_locals(locals_: dict[str, str]) -> str:
     return ", ".join(f"{name}={value}" for name, value in locals_.items())
+
+
+def _location_link(location: str) -> t.Any:
+    """A rich.text.Text for a "{file}:{line}, in {func}" location
+    string, styled as a file:// link when the file portion parses
+    cleanly (reuses _LOCATION_RE, the same pattern .plain_text already
+    parses this exact format with) -- falls back to plain, unstyled
+    text for anything that doesn't match rather than guessing."""
+    from rich.text import Text
+
+    match = _LOCATION_RE.match(location)
+    if match is None:
+        return Text(location, style="dim")
+    path = match.group(1)
+    return Text(location, style=f"dim link file://{path}")
+
+
+def _locals_table(locals_: dict[str, str], table_cls: t.Any) -> t.Any:
+    table = table_cls(show_header=False, box=None, padding=(0, 1, 0, 2))
+    table.add_column(style="cyan")
+    table.add_column(style="white")
+    for name, value in locals_.items():
+        table.add_row(name, value)
+    return table
 
 
 def _exception_type_name(step: ExplanationStep) -> str | None:
