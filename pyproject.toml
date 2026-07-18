@@ -100,7 +100,7 @@ rollbar = ["rollbar>=1.0"]
 honeybadger = ["honeybadger>=0.15"]
 elastic-apm = ["elastic-apm>=6.15"]
 bugsnag = ["bugsnag>=4.5"]
-structlog = ["structlog>=23.0"]
+structlog = ["structlog>=23.1"]
 loguru = ["loguru>=0.7"]
 # stdlib `logging` needs no extra -- whytrail.integrations.logging has
 # no third-party dependency, only whytrail itself.
@@ -130,6 +130,20 @@ dev = [
     "click>=8.0",
     "jinja2>=3.0",
     "ruff>=0.6",
+    # requests: three tests (test_a_builtin_explainer_actually_registers_and_wins_over_tier_1,
+    # test_list_builtin_plugins_reports_a_real_dev_dependency_as_available,
+    # test_cli_plugins_json_is_valid_and_has_the_expected_shape) exercise
+    # the real builtin-explainer load path end to end against "a real dev
+    # dependency," on the assumption requests was already one -- it
+    # wasn't (only listed under the separate `all` extra), so all three
+    # failed the moment the core CI `test` job ran for real with only
+    # `.[dev]` installed, never caught locally where every extra already
+    # happened to be present together. requests is lightweight with no
+    # heavy transitive dependencies, unlike most of `all`'s other 60
+    # entries, so it's a reasonable one to promote here rather than
+    # rewrite those tests to skip when it's absent -- skipping would
+    # defeat their whole point of running in the always-run suite.
+    "requests>=2.25",
 ]
 docs = [
     "mkdocs>=1.6",
@@ -205,6 +219,42 @@ python_version = "3.12"
 # where mypy passed locally only because an earlier, unrelated task in
 # this environment had opentelemetry-api installed already.
 module = "opentelemetry.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# The per-extra `mypy --strict` CI step (plugin-contract-tests job)
+# type-checks each integration file in an environment with only that
+# one extra installed -- genuinely revealing, for the first time on
+# real CI, that these 17 third-party libraries ship no inline types
+# (py.typed) and have no stub package installed there either. Every
+# one of these reproduced locally too once actually run in isolation
+# (`mypy --strict src/whytrail/integrations/boto3.py`) -- this session's
+# earlier "mypy clean on integrations/" pass simply never ran each file
+# standalone, only in a dev venv where dozens of other extras were
+# already installed together, which never surfaces a *specific* file's
+# own missing-stub situation. Same fix as the opentelemetry.* override
+# above, at 17x the scale: whytrail's own code in each of these files is
+# still fully strict-checked, just without also verifying against a
+# type surface these libraries don't publish.
+module = [
+    "botocore", "botocore.*",
+    "django", "django.*",
+    "celery", "celery.*",
+    "grpc", "grpc.*",
+    "pandas", "pandas.*",
+    "jsonschema", "jsonschema.*",
+    "asyncpg", "asyncpg.*",
+    "pika", "pika.*",
+    "yaml", "yaml.*",
+    "kubernetes", "kubernetes.*",
+    "pyodbc", "pyodbc.*",
+    "python_http_client", "python_http_client.*",
+    "pymysql", "pymysql.*",
+    "paramiko", "paramiko.*",
+    "newrelic", "newrelic.*",
+    "honeybadger", "honeybadger.*",
+    "cassandra", "cassandra.*",
+]
 ignore_missing_imports = true
 
 [tool.hatch.metadata]

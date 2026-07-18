@@ -535,14 +535,14 @@ jobs:
           - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15.0", dependency-version: latest }
           - { extra: bugsnag, dependency: bugsnag, floor: "4.5.0", dependency-version: floor }
           - { extra: bugsnag, dependency: bugsnag, floor: "4.5.0", dependency-version: latest }
-          # structlog/loguru floors: aspirational, matching pyproject.toml
-          # -- not yet confirmed against a real CI run the way every floor
-          # above this comment was (each of those started the same way and
-          # was corrected where wrong; see CHANGELOG.md's batch-by-batch
-          # floor-correction history). Flagged here rather than presented
-          # as verified.
-          - { extra: structlog, dependency: structlog, floor: "23.0.0", dependency-version: floor }
-          - { extra: structlog, dependency: structlog, floor: "23.0.0", dependency-version: latest }
+          # structlog/loguru floors: now confirmed against the first real
+          # CI run, matching every floor above this comment (each started
+          # the same way and was corrected where wrong; see CHANGELOG.md's
+          # batch-by-batch floor-correction history). structlog's guess
+          # was wrong -- 23.0.0 was never actually published (versions
+          # jump 22.3.0 -> 23.1.0) -- loguru's 0.7.0 was confirmed correct.
+          - { extra: structlog, dependency: structlog, floor: "23.1.0", dependency-version: floor }
+          - { extra: structlog, dependency: structlog, floor: "23.1.0", dependency-version: latest }
           - { extra: loguru, dependency: loguru, floor: "0.7.0", dependency-version: floor }
           - { extra: loguru, dependency: loguru, floor: "0.7.0", dependency-version: latest }
     steps:
@@ -683,7 +683,7 @@ jobs:
           - { extra: honeybadger, dependency: honeybadger, floor: "0.15", python-version: "3.10" }
           - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15", python-version: "3.10" }
           - { extra: bugsnag, dependency: bugsnag, floor: "4.5", python-version: "3.10" }
-          - { extra: structlog, dependency: structlog, floor: "23.0", python-version: "3.10" }
+          - { extra: structlog, dependency: structlog, floor: "23.1", python-version: "3.10" }
           - { extra: loguru, dependency: loguru, floor: "0.7", python-version: "3.10" }
           - { extra: requests, dependency: requests, floor: "2.20", python-version: "3.11" }
           - { extra: httpx, dependency: httpx, floor: "0.27", python-version: "3.11" }
@@ -745,7 +745,7 @@ jobs:
           - { extra: honeybadger, dependency: honeybadger, floor: "0.15", python-version: "3.11" }
           - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15", python-version: "3.11" }
           - { extra: bugsnag, dependency: bugsnag, floor: "4.5", python-version: "3.11" }
-          - { extra: structlog, dependency: structlog, floor: "23.0", python-version: "3.11" }
+          - { extra: structlog, dependency: structlog, floor: "23.1", python-version: "3.11" }
           - { extra: loguru, dependency: loguru, floor: "0.7", python-version: "3.11" }
           - { extra: requests, dependency: requests, floor: "2.20", python-version: "3.12" }
           - { extra: httpx, dependency: httpx, floor: "0.27", python-version: "3.12" }
@@ -807,7 +807,7 @@ jobs:
           - { extra: honeybadger, dependency: honeybadger, floor: "0.15", python-version: "3.12" }
           - { extra: elastic-apm, dependency: elastic-apm, floor: "6.15", python-version: "3.12" }
           - { extra: bugsnag, dependency: bugsnag, floor: "4.5", python-version: "3.12" }
-          - { extra: structlog, dependency: structlog, floor: "23.0", python-version: "3.12" }
+          - { extra: structlog, dependency: structlog, floor: "23.1", python-version: "3.12" }
           - { extra: loguru, dependency: loguru, floor: "0.7", python-version: "3.12" }
     steps:
       - uses: actions/checkout@v4
@@ -873,11 +873,19 @@ jobs:
       # cache below is deliberately the only source of history, and it
       # starts from whatever this job's *first* real run on GitHub's
       # actual runners records -- not from anything produced in this
-      # sandbox. The first real run establishes the baseline and cannot
-      # fail this step (pytest-benchmark skips the compare-fail gate
-      # gracefully when there is nothing yet to compare against, confirmed
-      # directly by running with an empty storage directory rather than
-      # assumed from its docs).
+      # sandbox. The first real run establishes the baseline.
+      #
+      # That first run is exactly where this step's original assumption
+      # turned out wrong: the comment here used to claim pytest-benchmark
+      # "skips the compare-fail gate gracefully when there is nothing yet
+      # to compare against." It doesn't -- pytest-benchmark 5.2.3 raises
+      # `UsageError: --benchmark-compare-fail requires valid
+      # --benchmark-compare` the moment `--benchmark-compare` has no prior
+      # run to resolve against, confirmed by reproducing it locally with a
+      # genuinely empty storage directory (the previous claim wasn't
+      # re-verified against the version actually installed). Fixed by only
+      # passing the compare flags once a previous run's JSON file was
+      # actually restored from cache.
       - name: Restore previous benchmark history for this OS/Python combination
         uses: actions/cache@v4
         with:
@@ -887,7 +895,13 @@ jobs:
             benchmarks-ubuntu-latest-py3.12-
 
       - name: Performance regression gate (compare against last run, generous tolerance)
-        run: pytest benchmarks/ --benchmark-only --benchmark-compare --benchmark-compare-fail=min:400% --benchmark-autosave
+        run: |
+          if [ -n "$(find .benchmarks -name '*.json' 2>/dev/null)" ]; then
+            pytest benchmarks/ --benchmark-only --benchmark-compare --benchmark-compare-fail=min:400% --benchmark-autosave
+          else
+            echo "No previous benchmark history found (first run on this OS/Python combination) -- establishing baseline, nothing to compare against yet."
+            pytest benchmarks/ --benchmark-only --benchmark-autosave
+          fi
 
   mutation-testing:
     # Weekly only, same reasoning as plugin-version-matrix-py-range:
