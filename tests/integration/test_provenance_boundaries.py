@@ -21,6 +21,7 @@ had never actually been pinned down by a test before.
 from __future__ import annotations
 
 import functools
+import sys
 
 import pytest
 
@@ -60,6 +61,7 @@ def test_cached_property_composition_is_causally_correct():
     assert value == 42
 
 
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="asyncio.TaskGroup requires Python 3.11+")
 def test_asyncio_task_group_tracked_calls_do_not_cross_contaminate():
     import asyncio
 
