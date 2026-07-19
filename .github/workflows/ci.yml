@@ -228,12 +228,27 @@ jobs:
           #
           # `pytest` extra's module is pytest_plugin.py, not pytest.py --
           # a bare pytest.py would shadow the real pytest package name
-          # for anything importing it unqualified.
+          # for anything importing it unqualified. `discord-py`/`nats-py`
+          # are the same class of exception, found by this exact step
+          # failing on the first real CI run of the 0.3.1 batch (exit
+          # code 2, file not found): their extra names carry a `-py`
+          # suffix for PyPI-distribution clarity (the real package names
+          # are `discord.py` and `nats-py`) that their plugin modules
+          # deliberately don't repeat, matching the plain `import
+          # discord`/`import nats` names instead -- the
+          # `tests/plugin_contract/test_${test_name}_plugin.py` step
+          # above hit the identical mismatch for the same two extras
+          # and was fixed by renaming the test files to match the extra
+          # name; the module files themselves were never meant to
+          # follow that convention, so this step needs its own mapping
+          # instead.
           name="${{ matrix.extra }}"
           module_name="${name//-/_}"
-          if [ "$module_name" = "pytest" ]; then
-            module_name="pytest_plugin"
-          fi
+          case "$module_name" in
+            pytest) module_name="pytest_plugin" ;;
+            discord_py) module_name="discord" ;;
+            nats_py) module_name="nats" ;;
+          esac
           mypy --strict "src/whytrail/integrations/${module_name}.py"
 
   plugin-version-matrix:
