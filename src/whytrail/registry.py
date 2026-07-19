@@ -100,6 +100,70 @@ _BUILTIN_EXPLAINERS = (
     "influxdb",
     "pyzmq",
     "zeep",
+    # Batch: vector DBs / newer LLM SDKs (0.3.1, ecosystem push 63->100)
+    "pinecone",
+    "weaviate_client",
+    "qdrant_client",
+    "neo4j",
+    "cohere",
+    "mistralai",
+    # Batch: SaaS / commerce APIs (0.3.1)
+    "twilio",
+    "slack_sdk",
+    "plaid",
+    "docker",
+    "hvac",
+    "square",
+    # Batch: orchestration / messaging (0.3.1)
+    "temporalio",
+    "dagster",
+    "discord",
+    "nats",
+    # Batch: infra / DB (0.3.1). `transformers` considered and rejected:
+    # its only real error types (Repository/Revision/EntryNotFoundError)
+    # are literally the same class objects as huggingface_hub's, already
+    # registered by that extra -- confirmed via `is` identity, not
+    # assumed. transformers exposes no exception types of its own.
+    "firebase_admin",
+    "minio",
+    "arango",
+    "supabase",
+    # Batch: identity / observability / search / MLOps (0.3.1). `typesense`
+    # and `duckdb` considered and rejected -- both checked directly and
+    # found GENERIC (no structured fields beyond a plain message string
+    # on any exception class), the same verdict as redis-py/PyJWT.
+    # `pdpyras` (originally scoped) is deprecated as of 2025-06-20;
+    # `pagerduty`, its official successor, is what's actually built here.
+    "auth0",
+    "pagerduty",
+    "algoliasearch",
+    "mlflow",
+    "meilisearch",
+    "github",
+    "okta",
+    "chromadb",
+    "wandb",
+    # Batch: final round closing the 63->100 gap (0.3.1). `cloudinary`,
+    # `pyairtable`, `launchdarkly-server-sdk`, `mixpanel` considered and
+    # rejected -- GENERIC or N/A (pyairtable's HTTP errors are plain
+    # requests.exceptions.HTTPError, already covered by
+    # whytrail[requests]; launchdarkly's SDK deliberately never raises
+    # at all, by design -- flag evaluation degrades to a default value
+    # instead). `hubspot-api-client` considered and rejected for a
+    # different reason: each CRM object type (contacts, deals, tickets,
+    # ...) generates its own unrelated ApiException class with no
+    # shared base, so there's no single registration point that
+    # actually covers the SDK -- would need ~15 near-duplicate
+    # registrations to approximate one plugin, the concentrated version
+    # of the "shallow integrations" antipattern ADR 0003 already
+    # rejects at the ecosystem level.
+    "datadog_api_client",
+    "postmarker",
+    "simple_salesforce",
+    "zenpy",
+    "notion_client",
+    "dropbox",
+    "asana",
 )
 
 # The remaining 20 of the 63 total integrations: hook/middleware/signal
@@ -128,6 +192,7 @@ _HOOK_BASED_INTEGRATIONS = (
     "scrapy",
     "sentry",
     "structlog",
+    "aiohttp_server",
 )
 
 # The real top-level import for the underlying third-party library each
@@ -164,6 +229,7 @@ _HOOK_BASED_UNDERLYING_IMPORT: dict[str, str] = {
     "scrapy": "scrapy",
     "sentry": "sentry_sdk",
     "structlog": "structlog",
+    "aiohttp_server": "aiohttp",
 }
 
 

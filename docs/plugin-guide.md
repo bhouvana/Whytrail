@@ -245,11 +245,13 @@ a security-relevant integration needs to clear.
 
 ## The integrations that exist today
 
-63, all bundled (ADR 0006) -- 60 reached the original target this
-ecosystem push was scoped against, plus logging/structlog/loguru
-since (see `CHANGELOG.md` for batch-by-batch
-progress and ADR 0003 for whether that number should keep growing or
-this is a natural resting point). Each earns its place by clearing one of the
+100, all bundled (ADR 0006) -- 63 reached the previous resting point (60
+from the original ecosystem push, plus logging/structlog/loguru), and a
+0.3.1 push added 37 more spanning vector databases, newer LLM SDKs,
+SaaS/commerce APIs, orchestration/messaging, and identity/observability
+tooling (see `CHANGELOG.md` for batch-by-batch
+progress and ADR 0003 for the underlying triage methodology). Each earns
+its place by clearing one of the
 three bars in ADR 0003, verified against real objects, not assumed from
 documentation -- several of these (marked *) were corrected after their
 own tests caught the library's own message text leaking a value that was
@@ -323,6 +325,43 @@ carry no structured data beyond what tier 1 already shows for free.
 | [`logging`](../src/whytrail/integrations/logging.py) (core module, no extra needed) | integration | A `logging.Filter` appending explanations to any record with `exc_info` |
 | [`structlog`](../src/whytrail/integrations/structlog.py) | integration | A processor adding a structured `why` key to the event dict |
 | [`loguru`](../src/whytrail/integrations/loguru.py) | integration | `logger.patch()`-based, appends explanations to messages carrying exception info |
+| [`pinecone`](../src/whytrail/integrations/pinecone.py) | explainer | `PineconeApiException` status/error_code/request_id, redacted body |
+| [`weaviate-client`](../src/whytrail/integrations/weaviate_client.py) | explainer | `UnexpectedStatusCodeError`/`WeaviateQueryError` status, redacted response detail |
+| [`qdrant-client`](../src/whytrail/integrations/qdrant_client.py) | explainer | `UnexpectedResponse` status/reason, redacted structured content |
+| [`neo4j`](../src/whytrail/integrations/neo4j.py) | explainer | `Neo4jError`'s server-assigned code/classification/category/title, redacted message |
+| [`cohere`](../src/whytrail/integrations/cohere.py) | explainer | `ApiError` status code, redacted response body (same shape as `openai`/`anthropic`) |
+| [`mistralai`](../src/whytrail/integrations/mistralai.py) | explainer | `MistralError` status code, redacted response body |
+| [`twilio`](../src/whytrail/integrations/twilio.py) | explainer | `TwilioRestException` status/Twilio error code, redacted msg/details |
+| [`slack-sdk`](../src/whytrail/integrations/slack_sdk.py) | explainer | `SlackApiError`'s response status/error code, redacted response data |
+| [`plaid`](../src/whytrail/integrations/plaid.py) | explainer | `ApiException` status/reason, redacted body |
+| [`docker`](../src/whytrail/integrations/docker.py) | explainer | `APIError` status code, redacted daemon `.explanation` |
+| [`hvac`](../src/whytrail/integrations/hvac.py) | explainer | `VaultError` (+ per-status subclasses) -- fully redacted, `.url` is a Vault secret path |
+| [`square`](../src/whytrail/integrations/square.py) | explainer | `ApiError` status + per-error category/code taxonomy, redacted `.detail` |
+| [`temporalio`](../src/whytrail/integrations/temporalio.py) | explainer | `ApplicationError`'s retry semantics (non_retryable/next_retry_delay/category), redacted details |
+| [`dagster`](../src/whytrail/integrations/dagster.py) | explainer | Unwraps `DagsterUserCodeExecutionError` to the real underlying exception via recursive `why()` |
+| [`discord-py`](../src/whytrail/integrations/discord.py) | explainer | `HTTPException` status/Discord error code, redacted `.text` |
+| [`nats-py`](../src/whytrail/integrations/nats.py) | explainer | JetStream `APIError` code/err_code/stream/seq, redacted description |
+| [`aiohttp-server`](../src/whytrail/integrations/aiohttp_server.py) | integration | Safe-by-default exception middleware for `aiohttp.web`, distinct from the client-side `aiohttp` explainer |
+| [`firebase-admin`](../src/whytrail/integrations/firebase_admin.py) | explainer | `FirebaseError`'s canonical error code, redacted message + wrapped `.cause` |
+| [`minio`](../src/whytrail/integrations/minio.py) | explainer | `S3Error`'s fully-parsed XML error response, redacted bucket/object identity |
+| [`arango`](../src/whytrail/integrations/arango.py) | explainer | `ArangoServerError`'s HTTP + ArangoDB error codes, redacted message/URL |
+| [`supabase`](../src/whytrail/integrations/supabase.py) | explainer | `postgrest.exceptions.APIError` (the real exception supabase-py raises) status/code, redacted detail |
+| [`auth0`](../src/whytrail/integrations/auth0.py) | explainer | Authentication + Management API error hierarchies, status/error codes, redacted bodies |
+| [`pagerduty`](../src/whytrail/integrations/pagerduty.py) | explainer | `HttpError` status, redacted message -- supersedes the deprecated `pdpyras` |
+| [`algoliasearch`](../src/whytrail/integrations/algoliasearch.py) | explainer | `RequestException` status code, redacted message |
+| [`mlflow`](../src/whytrail/integrations/mlflow.py) | explainer | `MlflowException`'s documented error-code taxonomy + HTTP status, redacted message |
+| [`meilisearch`](../src/whytrail/integrations/meilisearch.py) | explainer | `MeilisearchApiError` status/code/type/link, redacted message |
+| [`github`](../src/whytrail/integrations/github.py) | explainer | PyGithub `GithubException` status, redacted response data |
+| [`okta`](../src/whytrail/integrations/okta.py) | explainer | `ApiException` status/reason, redacted response detail |
+| [`chromadb`](../src/whytrail/integrations/chromadb.py) | explainer | `ChromaError`'s per-subclass code/name taxonomy, redacted message |
+| [`wandb`](../src/whytrail/integrations/wandb.py) | explainer | `Error`'s context dict; `CommError` unwraps to the real underlying exception via recursive `why()` |
+| [`datadog-api-client`](../src/whytrail/integrations/datadog_api_client.py) | explainer | Datadog's own REST management API `ApiException`, distinct from the `ddtrace` APM tracer |
+| [`postmarker`](../src/whytrail/integrations/postmarker.py) | explainer | `ClientError`'s documented numeric error code |
+| [`simple-salesforce`](../src/whytrail/integrations/simple_salesforce.py) | explainer | Unified `SalesforceError` base -- status/resource/URL, redacted content |
+| [`zenpy`](../src/whytrail/integrations/zenpy.py) | explainer | Zendesk `APIException`'s real wrapped `requests.Response`, redacted body |
+| [`notion-client`](../src/whytrail/integrations/notion_client.py) | explainer | `HTTPResponseError` code/status/request_id, redacted body/additional_data |
+| [`dropbox`](../src/whytrail/integrations/dropbox.py) | explainer | `ApiError`'s request_id + Stone-generated route-specific error union, redacted |
+| [`asana`](../src/whytrail/integrations/asana.py) | explainer | Same generated-OpenAPI-client shape as `pinecone`/`plaid`/`okta`, redacted body |
 
 † required `weak=False` on the signal connection -- the default weak
 reference let the handler closure get garbage-collected immediately
@@ -352,6 +391,24 @@ on the exception itself -- same "nothing to add over tier 1" verdict as
 `redis-py`). See `docs/adr/0003-ecosystem-scale-triage.md` for the full
 reasoning and the much larger list of libraries that don't need a plugin
 at all.
+
+**Also not built, from the 0.3.1 push (63->100):** `ray` (no installable
+wheel for the environment this ecosystem was built in, an environment
+gap rather than a triage verdict); `transformers` (checked directly:
+its only real error types are the same class objects as
+`huggingface_hub`'s, confirmed via `is` identity -- already covered by
+that extra); `python-telegram-bot`, `typesense`, `duckdb`, `cloudinary`,
+`mixpanel` (all checked directly and found GENERIC -- no structured
+fields beyond a plain message string, same verdict as `redis-py`);
+`launchdarkly-server-sdk` (N/A -- the SDK deliberately never raises at
+all; flag evaluation degrades to a default value by design);
+`pyairtable` (GENERIC -- its HTTP errors are plain
+`requests.exceptions.HTTPError`, already covered by `whytrail[requests]`);
+`hubspot-api-client` (structural, not a data problem: each CRM object
+type generates its own unrelated `ApiException` class with no shared
+base, so there's no single registration point that actually covers the
+SDK -- would need ~15 near-duplicate registrations to approximate one
+plugin).
 
 **On test coverage:** every integration above is verified against a real
 object from the real library, including its redaction behavior where

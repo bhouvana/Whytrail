@@ -1,9 +1,15 @@
 # Testing maturity: what's verified, what isn't
 
-This project has 512 tests (499 passing plus 13 skipped for extras not
-installed in a given environment) across core whytrail and 63 bundled
+This project has 692 tests (679 passing plus 12 skipped for extras not
+installed in a given environment, and one pre-existing, unrelated
+failure -- `test_snowflake_redaction`, a Hypothesis-fuzzed case where
+the literal string "sqlstate" leaks into a Snowflake driver's own
+message text; found while verifying the 0.3.1 batch below, confirmed
+via `git stash` to already fail on unmodified `main`, not something
+this pass introduced or fixed) across core whytrail and 100 bundled
 integrations (ADR 0006 -- extras of the one `whytrail` package, not
-separate distributions). Every plugin's tests run against a real object from the
+separate distributions) -- 63 reached the previous resting point, and a
+0.3.1 push added 37 more (see `CHANGELOG.md`). Every plugin's tests run against a real object from the
 real library rather than a mock, a representative sample of the
 redaction-critical ones are now property-tested rather than
 spot-checked, and the safety-critical web middleware, task-queue

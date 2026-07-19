@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "whytrail"
-version = "0.3.0"
+version = "0.3.1"
 description = "Python tells you where. whytrail tells you why a value is the way it is."
 readme = "README.md"
 license = "MIT"
@@ -79,6 +79,78 @@ influxdb = ["influxdb-client>=1.30"]
 pyzmq = ["pyzmq>=24.0"]
 zeep = ["zeep>=4.1"]
 
+# Vector DBs / newer LLM SDKs (0.3.1, ecosystem push 63->100): each
+# clears bar 1 (structured error data a bare traceback discards),
+# confirmed against the real installed library's exception source, not
+# assumed from documentation -- see CHANGELOG.md.
+pinecone = ["pinecone>=6.0"]
+weaviate-client = ["weaviate-client>=4.9"]
+qdrant-client = ["qdrant-client>=1.10"]
+neo4j = ["neo4j>=5.24"]
+cohere = ["cohere>=5.0"]
+mistralai = ["mistralai>=1.0"]
+
+# SaaS / commerce APIs (0.3.1, ecosystem push 63->100): each carries a
+# structured error body/taxonomy a bare traceback discards. Note:
+# the `square` extra's PyPI distribution is `squareup` (the `square`
+# name was already taken on PyPI) even though the import name is
+# `square` -- confirmed by trying to install `square` directly and
+# getting an unrelated package.
+twilio = ["twilio>=8.0"]
+slack-sdk = ["slack-sdk>=3.27"]
+plaid = ["plaid-python>=18.0"]
+docker = ["docker>=7.0"]
+hvac = ["hvac>=2.0"]
+square = ["squareup>=39.0"]
+
+# Orchestration / messaging (0.3.1, ecosystem push 63->100). `ray`
+# considered and dropped -- no installable wheel for this environment's
+# Python/OS combination (same class of environment gap this project
+# already documents for Selenium/Playwright's browser binaries), not
+# assessed against ADR 0003's bars at all. `nats-py`'s own base client
+# errors (`nats.errors`) were checked and are almost entirely GENERIC --
+# only its separate JetStream API error hierarchy (`nats.js.errors`)
+# clears bar 1, see src/whytrail/integrations/nats.py.
+temporalio = ["temporalio>=1.7"]
+dagster = ["dagster>=1.7"]
+discord-py = ["discord.py>=2.3"]
+nats-py = ["nats-py>=2.7"]
+
+# Infra / DB (0.3.1, ecosystem push 63->100). `transformers` considered
+# and rejected -- see registry.py's _BUILTIN_EXPLAINERS comment: its
+# error types are the same objects as huggingface_hub's, already
+# covered by that extra.
+firebase-admin = ["firebase-admin>=6.0"]
+minio = ["minio>=7.2"]
+arango = ["python-arango>=7.9"]
+supabase = ["supabase>=2.0"]
+
+# Identity / observability / search / MLOps (0.3.1, ecosystem push
+# 63->100). `typesense`/`duckdb` considered and rejected as GENERIC --
+# see registry.py's _BUILTIN_EXPLAINERS comment. `pagerduty` supersedes
+# the deprecated `pdpyras` (deprecated 2025-06-20).
+auth0 = ["auth0-python>=4.0"]
+pagerduty = ["pagerduty>=1.0"]
+algoliasearch = ["algoliasearch>=3.0"]
+mlflow = ["mlflow>=2.10"]
+meilisearch = ["meilisearch>=0.31"]
+github = ["PyGithub>=2.1"]
+okta = ["okta>=2.9"]
+chromadb = ["chromadb>=0.5"]
+wandb = ["wandb>=0.16"]
+
+# Final round closing the 63->100 gap (0.3.1). `cloudinary`,
+# `pyairtable`, `launchdarkly-server-sdk`, `mixpanel`, and
+# `hubspot-api-client` considered and rejected -- see registry.py's
+# _BUILTIN_EXPLAINERS comment for why each doesn't clear the bar.
+datadog-api-client = ["datadog-api-client>=2.20"]
+postmarker = ["postmarker>=1.0"]
+simple-salesforce = ["simple-salesforce>=1.12"]
+zenpy = ["zenpy>=2.0"]
+notion-client = ["notion-client>=2.0"]
+dropbox = ["dropbox>=11.36"]
+asana = ["asana>=5.0"]
+
 # Integration-shaped (hook/middleware/signal-based, ADR 0006): the extra
 # only pulls in the dependency -- nothing auto-registers, since these
 # need explicit wiring (an on_failure=[...] hook, a middleware class,
@@ -104,12 +176,13 @@ structlog = ["structlog>=23.1"]
 loguru = ["loguru>=0.7"]
 # stdlib `logging` needs no extra -- whytrail.integrations.logging has
 # no third-party dependency, only whytrail itself.
+aiohttp-server = ["aiohttp>=3.9"]
 
 # Every integration above in one install, for trying whytrail broadly or
 # CI matrices -- not meant as a typical user's default (see ADR 0006 for
 # why each stays its own extra instead of always installing everything).
 all = [
-    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sendgrid,websockets,opensearch,pyodbc,google-genai,oracledb,confluent-kafka,pymysql,pymssql,clickhouse,snowflake,graphql-core,tenacity,psycopg,cassandra,influxdb,pyzmq,zeep,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain,newrelic,rollbar,honeybadger,elastic-apm,bugsnag,structlog,loguru]",
+    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sendgrid,websockets,opensearch,pyodbc,google-genai,oracledb,confluent-kafka,pymysql,pymssql,clickhouse,snowflake,graphql-core,tenacity,psycopg,cassandra,influxdb,pyzmq,zeep,pinecone,weaviate-client,qdrant-client,neo4j,cohere,mistralai,twilio,slack-sdk,plaid,docker,hvac,square,temporalio,dagster,discord-py,nats-py,firebase-admin,minio,arango,supabase,auth0,pagerduty,algoliasearch,mlflow,meilisearch,github,okta,chromadb,wandb,datadog-api-client,postmarker,simple-salesforce,zenpy,notion-client,dropbox,asana,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain,newrelic,rollbar,honeybadger,elastic-apm,bugsnag,structlog,loguru,aiohttp-server]",
 ]
 
 dev = [
@@ -254,6 +327,16 @@ module = [
     "newrelic", "newrelic.*",
     "honeybadger", "honeybadger.*",
     "cassandra", "cassandra.*",
+    # Added for the 0.3.1 ecosystem push (63->100): same missing-stub
+    "twilio", "twilio.*",
+    "plaid", "plaid.*",
+    "docker", "docker.*",
+    "hvac", "hvac.*",
+    "firebase_admin", "firebase_admin.*",
+    "postmarker", "postmarker.*",
+    "zenpy", "zenpy.*",
+    "dropbox", "dropbox.*",
+    "asana", "asana.*",
 ]
 ignore_missing_imports = true
 

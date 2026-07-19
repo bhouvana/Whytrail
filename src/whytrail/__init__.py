@@ -42,7 +42,7 @@ from .registry import coerce, register, register_from_plugin, resolve_explainer
 from .runtime.capture import track, tracked
 from .runtime.context import current_scope, default_graph, trace
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 # Deliberately small: five verbs, two persistence helpers plus the one
 # exception they can raise (SnapshotVersionError -- added 0.3, found

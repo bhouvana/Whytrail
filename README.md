@@ -220,17 +220,17 @@ One package, one version -- all integrations below are extras of
 `whytrail` itself, not separate PyPI packages (ADR 0006). `pip install
 whytrail[X]` pulls in exactly the library `X` explains, nothing else;
 `why()` picks it up automatically the moment it's installed, no further
-setup. `whytrail plugins` (needs the `cli` extra) lists all 63 and
+setup. `whytrail plugins` (needs the `cli` extra) lists all 100 and
 whether each is actually active in your current environment:
 
 ```bash
 $ whytrail plugins
-Auto-registering (explainer-shaped), active in this environment: 27/43
+Auto-registering (explainer-shaped), active in this environment: 27/79
   [x] requests
   [x] httpx
   [ ] stripe
   ...
-Integration-shaped (need explicit install()/wiring in your code): 20/20 importable
+Integration-shaped (need explicit install()/wiring in your code): 21/21 importable
   [x] fastapi
   [x] django
   ...
@@ -300,18 +300,19 @@ are extras of this same package, not new verbs -- see
 
 ## Ecosystem
 
-63 integrations today -- 60 reached the original target this ecosystem
-push was scoped against, plus `logging`/`structlog`/`loguru` since --
-each earning its place by clearing one of three bars (structured error
-data, a security-sensitive boundary, or a non-standard capture
-mechanism) rather than existing just to exist -- see
-`docs/adr/0003-ecosystem-scale-triage.md` for the
-full reasoning, the next candidates, and the much longer list of
-libraries deliberately *not* wrapped, because generic `track()`/
-`@tracked` already covers them with zero extra code, or because they
-were checked directly and found to carry no structured data beyond
-what tier 1 already shows for free. Full table with what each one
-adds: `docs/plugin-guide.md`.
+100 integrations today -- 63 reached the previous resting point (60 from
+the original ecosystem push, plus `logging`/`structlog`/`loguru`), and a
+0.3.1 push spanning vector databases, newer LLM SDKs, SaaS/commerce
+APIs, orchestration/messaging, and identity/observability tooling added
+37 more, each earning its place by clearing one of three bars
+(structured error data, a security-sensitive boundary, or a
+non-standard capture mechanism) rather than existing just to exist --
+see `docs/adr/0003-ecosystem-scale-triage.md` for the full reasoning,
+the next candidates, and the much longer list of libraries deliberately
+*not* wrapped, because generic `track()`/`@tracked` already covers them
+with zero extra code, or because they were checked directly and found
+to carry no structured data beyond what tier 1 already shows for free.
+Full table with what each one adds: `docs/plugin-guide.md`.
 
 | | | |
 |---|---|---|
@@ -336,6 +337,19 @@ adds: `docs/plugin-guide.md`.
 | `whytrail[langchain]` | `whytrail[newrelic]` | `whytrail[rollbar]` |
 | `whytrail[honeybadger]` | `whytrail[elastic-apm]` | `whytrail[bugsnag]` |
 | `whytrail[structlog]` | `whytrail[loguru]` | `logging` (stdlib, no extra) |
+| `whytrail[pinecone]` | `whytrail[weaviate-client]` | `whytrail[qdrant-client]` |
+| `whytrail[neo4j]` | `whytrail[cohere]` | `whytrail[mistralai]` |
+| `whytrail[twilio]` | `whytrail[slack-sdk]` | `whytrail[plaid]` |
+| `whytrail[docker]` | `whytrail[hvac]` | `whytrail[square]` |
+| `whytrail[temporalio]` | `whytrail[dagster]` | `whytrail[discord-py]` |
+| `whytrail[nats-py]` | `whytrail[aiohttp-server]` | `whytrail[firebase-admin]` |
+| `whytrail[minio]` | `whytrail[arango]` | `whytrail[supabase]` |
+| `whytrail[auth0]` | `whytrail[pagerduty]` | `whytrail[algoliasearch]` |
+| `whytrail[mlflow]` | `whytrail[meilisearch]` | `whytrail[github]` |
+| `whytrail[okta]` | `whytrail[chromadb]` | `whytrail[wandb]` |
+| `whytrail[datadog-api-client]` | `whytrail[postmarker]` | `whytrail[simple-salesforce]` |
+| `whytrail[zenpy]` | `whytrail[notion-client]` | `whytrail[dropbox]` |
+| `whytrail[asana]` | | |
 
 All of the above in one install: `pip install whytrail[all]`. Want to publish your
 own, outside this repo, for a library not on this list?

@@ -11,6 +11,96 @@ changelog section. Reconstructed retroactively from `git log` (the
 commit that bumped `pyproject.toml`'s version is the same one that did
 the plugin unification), not from memory of what was released when.
 
+## [0.3.1] - 2026-07-19
+
+### Ecosystem push: 63 -> 100 integrations
+
+37 new bundled integrations, built in six batches (vector DBs/newer LLM
+SDKs, SaaS/commerce APIs, orchestration/messaging, infra/DB, identity/
+observability/search/MLOps, and a final round closing the gap), each
+checked against ADR 0003's three bars before any code was written and
+verified against a real object from the real library, not a mock --
+the same bar every prior integration was held to. A real reject was
+treated the same way ADR 0003's own history already treats one: logged
+and swapped for the next candidate, not forced in to hit a round
+number.
+
+**Added:** `pinecone`, `weaviate-client`, `qdrant-client`, `neo4j`,
+`cohere`, `mistralai`, `twilio`, `slack-sdk`, `plaid`, `docker`,
+`hvac`, `square`, `temporalio`, `dagster`, `discord-py`, `nats-py`,
+`aiohttp-server`, `firebase-admin`, `minio`, `arango`, `supabase`,
+`auth0`, `pagerduty`, `algoliasearch`, `mlflow`, `meilisearch`,
+`github`, `okta`, `chromadb`, `wandb`, `datadog-api-client`,
+`postmarker`, `simple-salesforce`, `zenpy`, `notion-client`, `dropbox`,
+`asana`. Full table with what each one adds: `docs/plugin-guide.md`.
+
+**Checked and rejected, not silently skipped:** `ray` (no installable
+wheel for this environment); `transformers` (its only real error types
+are the same class objects as `huggingface_hub`'s, confirmed via `is`
+identity -- already covered); `python-telegram-bot`, `typesense`,
+`duckdb`, `cloudinary`, `mixpanel` (GENERIC -- no structured fields
+beyond a plain message string, same verdict as `redis-py`/`PyJWT`);
+`launchdarkly-server-sdk` (N/A -- the SDK deliberately never raises,
+by design); `pyairtable` (GENERIC -- its HTTP errors are plain
+`requests.exceptions.HTTPError`, already covered); `hubspot-api-client`
+(structural: each CRM object type generates its own unrelated
+`ApiException` with no shared base -- no single registration point
+actually covers the SDK). See `docs/plugin-guide.md`'s "Not built"
+section for the full list and reasoning.
+
+**Real bugs/findings caught while building this batch, not assumed:**
+- `pinecone-client` is a deprecated, renamed PyPI distribution that
+  raises on import -- targeted the current `pinecone` package instead.
+- `cohere`'s `ApiError` isn't re-exported from `cohere.errors` --
+  actually lives at `cohere.core.api_error.ApiError`, found by walking
+  a subclass's `__mro__` rather than trusting the public module names.
+- Caught our own bug before shipping: an early `weaviate-client` draft
+  put a raw query-error message in `Explanation.subject`, which
+  `.redacted()` doesn't strip for explainer-produced results (only
+  `locals` is covered). Fixed to keep `subject` generic; same class of
+  bug caught again independently in `square` (whose SDK bakes the
+  entire response body into its own `str(exc)`/`args[0]`) and `arango`
+  (same pre-built-message-string issue).
+- `mistralai` pins `opentelemetry-semantic-conventions<0.61`,
+  incompatible with `opentelemetry-sdk`'s own `==0.64b0` pin --
+  installing both in one environment silently downgrades shared otel
+  packages. Not a CI-facing issue (each extra installs in its own
+  isolated job), but worth knowing for anyone combining `otel` and
+  `mistralai` in one project.
+- `dagster` and `wandb`'s `CommError` both turned out to be "wrapper,
+  not root cause" shapes -- reused the recursive `why()` unwrap pattern
+  `tenacity` already established rather than inventing a new one.
+- `github`/`GithubException`: `github/__init__.py` does `from
+  .GithubException import GithubException`, rebinding the
+  `github.GithubException` *attribute* to the class itself and
+  shadowing the submodule -- the chained-attribute import form that
+  works for every other same-named module in this ecosystem
+  (`requests.py`, `docker.py`, ...) raised `AttributeError` here. Fixed
+  with a direct `from github.GithubException import GithubException`.
+- `okta`'s SDK ships two exception hierarchies from what looks like a
+  merged/generated module -- the obviously-named `OktaAPIException`/
+  `HTTPException` are empty pass-throughs; the real structured one is
+  `okta.exceptions.exceptions.ApiException`, found by tracing the SDK's
+  own status-code dispatch logic, not the shorter class name.
+  `pdpyras` (the originally scoped PagerDuty candidate) turned out to
+  be deprecated as of 2025-06-20 -- built against its official
+  successor, `pagerduty`, instead.
+- `simple-salesforce` transitively depends on `zeep` (a SOAP client) --
+  harmless in isolated per-extra CI, but worth knowing if combining
+  `dev` and `simple-salesforce` extras in one environment.
+
+**mypy `--strict`:** 9 new entries added to the existing "no published
+stubs" `ignore_missing_imports` override list (`pinecone`, `twilio`,
+`plaid`, `docker`, `hvac`, `firebase_admin`, `postmarker`, `zenpy`,
+`dropbox`, `asana` -- several modules already shipped clean), plus one
+targeted per-line ignore for an untyped `mlflow` method rather than a
+whole-module override.
+
+**Docs reconciled:** `README.md` (ecosystem count/extras grid, `whytrail
+plugins` example counts), `docs/plugin-guide.md` (full table + "not
+built" list), `docs/testing-maturity.md` (test/integration counts) --
+the exact set `docs/plugin-guide.md` itself names as easy to forget.
+
 ## [0.3.0] - 2026-07-18
 
 ### Release-readiness hardening pass

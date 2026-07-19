@@ -143,6 +143,43 @@ jobs:
           - bugsnag
           - structlog
           - loguru
+          - pinecone
+          - weaviate-client
+          - qdrant-client
+          - neo4j
+          - cohere
+          - mistralai
+          - twilio
+          - slack-sdk
+          - plaid
+          - docker
+          - hvac
+          - square
+          - temporalio
+          - dagster
+          - discord-py
+          - nats-py
+          - aiohttp-server
+          - firebase-admin
+          - minio
+          - arango
+          - supabase
+          - auth0
+          - pagerduty
+          - algoliasearch
+          - mlflow
+          - meilisearch
+          - github
+          - okta
+          - chromadb
+          - wandb
+          - datadog-api-client
+          - postmarker
+          - simple-salesforce
+          - zenpy
+          - notion-client
+          - dropbox
+          - asana
     steps:
       - uses: actions/checkout@v4
 
