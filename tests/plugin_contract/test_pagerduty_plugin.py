@@ -1,13 +1,21 @@
 """Validates whytrail's pagerduty plugin against a real
-pagerduty.HttpError wrapping a real httpx.Response -- no live
-PagerDuty account needed."""
+pagerduty.HttpError -- no live PagerDuty account needed.
+
+Found via real CI (not local Windows testing, which had a real popular
+package named `httpx` already installed as a transitive dependency of
+several other bundled extras and masked this): the real `pagerduty`
+PyPI package depends on `httpx2`, not the far more common `httpx` --
+confirmed via its published `requires_dist` metadata. A minimal
+duck-typed response stand-in (matching `test_discord_plugin.py`'s own
+`_FakeResponse` pattern) avoids depending on either, since
+`HttpError.response` only ever needs `.status_code` here.
+"""
 
 from __future__ import annotations
 
 import pytest
 
 pagerduty = pytest.importorskip("pagerduty")
-httpx = pytest.importorskip("httpx")
 pytest.importorskip("whytrail.integrations.pagerduty")
 
 import whytrail  # noqa: E402
@@ -16,10 +24,15 @@ from whytrail import registry  # noqa: E402
 SECRET_INCIDENT = "incident for secret-customer-outage"
 
 
+class _FakeResponse:
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+
+
 def _http_error(msg=None):
-    request = httpx.Request("GET", "https://api.pagerduty.com/incidents/P123")
-    response = httpx.Response(404, request=request)
-    return pagerduty.HttpError(msg if msg is not None else f"Not found: {SECRET_INCIDENT}", response)
+    return pagerduty.HttpError(
+        msg if msg is not None else f"Not found: {SECRET_INCIDENT}", _FakeResponse(status_code=404)
+    )
 
 
 def test_plugin_is_discovered_via_entry_point():
