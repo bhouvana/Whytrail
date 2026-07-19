@@ -180,6 +180,8 @@ jobs:
           - notion-client
           - dropbox
           - asana
+          - groq
+          - replicate
     steps:
       - uses: actions/checkout@v4
 

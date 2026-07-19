@@ -220,12 +220,12 @@ One package, one version -- all integrations below are extras of
 `whytrail` itself, not separate PyPI packages (ADR 0006). `pip install
 whytrail[X]` pulls in exactly the library `X` explains, nothing else;
 `why()` picks it up automatically the moment it's installed, no further
-setup. `whytrail plugins` (needs the `cli` extra) lists all 100 and
+setup. `whytrail plugins` (needs the `cli` extra) lists all 102 and
 whether each is actually active in your current environment:
 
 ```bash
 $ whytrail plugins
-Auto-registering (explainer-shaped), active in this environment: 27/79
+Auto-registering (explainer-shaped), active in this environment: 27/81
   [x] requests
   [x] httpx
   [ ] stripe
@@ -300,11 +300,11 @@ are extras of this same package, not new verbs -- see
 
 ## Ecosystem
 
-100 integrations today -- 63 reached the previous resting point (60 from
+102 integrations today -- 63 reached the previous resting point (60 from
 the original ecosystem push, plus `logging`/`structlog`/`loguru`), and a
 0.3.1 push spanning vector databases, newer LLM SDKs, SaaS/commerce
 APIs, orchestration/messaging, and identity/observability tooling added
-37 more, each earning its place by clearing one of three bars
+39 more, each earning its place by clearing one of three bars
 (structured error data, a security-sensitive boundary, or a
 non-standard capture mechanism) rather than existing just to exist --
 see `docs/adr/0003-ecosystem-scale-triage.md` for the full reasoning,
@@ -349,7 +349,7 @@ Full table with what each one adds: `docs/plugin-guide.md`.
 | `whytrail[okta]` | `whytrail[chromadb]` | `whytrail[wandb]` |
 | `whytrail[datadog-api-client]` | `whytrail[postmarker]` | `whytrail[simple-salesforce]` |
 | `whytrail[zenpy]` | `whytrail[notion-client]` | `whytrail[dropbox]` |
-| `whytrail[asana]` | | |
+| `whytrail[asana]` | `whytrail[groq]` | `whytrail[replicate]` |
 
 All of the above in one install: `pip install whytrail[all]`. Want to publish your
 own, outside this repo, for a library not on this list?

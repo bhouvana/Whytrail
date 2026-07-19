@@ -101,6 +101,51 @@ plugins` example counts), `docs/plugin-guide.md` (full table + "not
 built" list), `docs/testing-maturity.md` (test/integration counts) --
 the exact set `docs/plugin-guide.md` itself names as easy to forget.
 
+### Follow-up: 100 -> 102, `groq` and `replicate`
+
+Two more added to fill out `README.md`'s ecosystem table completely --
+`groq` (`APIStatusError`/`APIConnectionError`, the SDK explicitly
+modeled after and mirroring `whytrail[openai]`'s own shape) and
+`replicate` (`ReplicateError`'s RFC 7807 problem-details fields --
+type/title/status/detail). Same bar, same verification: real objects,
+ruff and mypy `--strict` clean, all docs/counts updated to 102.
+
+### CI fixes: two real failures from the first real run of this batch
+
+Real Linux CI (not this local sandbox) caught two genuine bugs the
+0.3.1 batch above had shipped, both fixed and re-verified green before
+this release closed out:
+
+- `discord-py`/`nats-py`: two separate CI steps (the
+  `plugin-contract-tests` pytest step and its own `mypy --strict`
+  step) both derive a target filename from the matrix extra name via
+  dash-to-underscore substitution. These two extras carry a `-py`
+  suffix their plugin *module* names deliberately don't repeat
+  (matching the plain `import discord`/`import nats` names instead),
+  which every other differently-suffixed extra in this batch (e.g.
+  `weaviate-client`) happened to still satisfy -- pytest exit code 4
+  (file not found) and mypy exit code 2 (file not found) on both,
+  fixed by renaming the two test files to match the extra name and
+  adding an explicit case-statement mapping for the mypy step, the
+  same pattern this script already used for `pytest` -> `pytest_plugin`.
+- `pagerduty`: pytest exit code 5 (no tests collected). The test
+  imported `httpx` to build a fake response -- but the real `pagerduty`
+  PyPI package depends on `httpx2`, not `httpx` (confirmed via its
+  published `requires_dist`). `httpx` happened to already be installed
+  in the local dev sandbox as a transitive dependency of several
+  *other* bundled extras, so `pytest.importorskip("httpx")` silently
+  succeeded there and masked the gap entirely -- passed locally, failed
+  on a real isolated CI install of `whytrail[dev,pagerduty]` alone.
+  Fixed with a minimal duck-typed response stand-in instead of
+  depending on either httpx variant.
+
+Audited every other new test file for the same "helper import not
+actually guaranteed by that extra + dev" class of bug -- 34 of 37
+plugin-contract-tests jobs passed clean on the first CI run; the
+remaining httpx/requests imports elsewhere are all confirmed real,
+published dependencies of those specific libraries (or covered by the
+`requests>=2.25` dev dependency regardless).
+
 ## [0.3.0] - 2026-07-18
 
 ### Release-readiness hardening pass

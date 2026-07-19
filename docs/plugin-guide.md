@@ -245,9 +245,9 @@ a security-relevant integration needs to clear.
 
 ## The integrations that exist today
 
-100, all bundled (ADR 0006) -- 63 reached the previous resting point (60
+102, all bundled (ADR 0006) -- 63 reached the previous resting point (60
 from the original ecosystem push, plus logging/structlog/loguru), and a
-0.3.1 push added 37 more spanning vector databases, newer LLM SDKs,
+0.3.1 push added 39 more spanning vector databases, newer LLM SDKs,
 SaaS/commerce APIs, orchestration/messaging, and identity/observability
 tooling (see `CHANGELOG.md` for batch-by-batch
 progress and ADR 0003 for the underlying triage methodology). Each earns
@@ -362,6 +362,8 @@ carry no structured data beyond what tier 1 already shows for free.
 | [`notion-client`](../src/whytrail/integrations/notion_client.py) | explainer | `HTTPResponseError` code/status/request_id, redacted body/additional_data |
 | [`dropbox`](../src/whytrail/integrations/dropbox.py) | explainer | `ApiError`'s request_id + Stone-generated route-specific error union, redacted |
 | [`asana`](../src/whytrail/integrations/asana.py) | explainer | Same generated-OpenAPI-client shape as `pinecone`/`plaid`/`okta`, redacted body |
+| [`groq`](../src/whytrail/integrations/groq.py) | explainer | `APIStatusError`/`APIConnectionError`, same shape as `openai`/`anthropic`/`cohere` |
+| [`replicate`](../src/whytrail/integrations/replicate.py) | explainer | `ReplicateError`'s RFC 7807 problem-details fields (type/title/status), redacted detail |
 
 † required `weak=False` on the signal connection -- the default weak
 reference let the handler closure get garbage-collected immediately

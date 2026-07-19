@@ -164,6 +164,9 @@ _BUILTIN_EXPLAINERS = (
     "notion_client",
     "dropbox",
     "asana",
+    # Two more closing out the ecosystem table's last row (100->102).
+    "groq",
+    "replicate",
 )
 
 # The remaining 20 of the 63 total integrations: hook/middleware/signal

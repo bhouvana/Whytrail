@@ -150,6 +150,8 @@ zenpy = ["zenpy>=2.0"]
 notion-client = ["notion-client>=2.0"]
 dropbox = ["dropbox>=11.36"]
 asana = ["asana>=5.0"]
+groq = ["groq>=0.9"]
+replicate = ["replicate>=1.0"]
 
 # Integration-shaped (hook/middleware/signal-based, ADR 0006): the extra
 # only pulls in the dependency -- nothing auto-registers, since these
@@ -182,7 +184,7 @@ aiohttp-server = ["aiohttp>=3.9"]
 # CI matrices -- not meant as a typical user's default (see ADR 0006 for
 # why each stays its own extra instead of always installing everything).
 all = [
-    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sendgrid,websockets,opensearch,pyodbc,google-genai,oracledb,confluent-kafka,pymysql,pymssql,clickhouse,snowflake,graphql-core,tenacity,psycopg,cassandra,influxdb,pyzmq,zeep,pinecone,weaviate-client,qdrant-client,neo4j,cohere,mistralai,twilio,slack-sdk,plaid,docker,hvac,square,temporalio,dagster,discord-py,nats-py,firebase-admin,minio,arango,supabase,auth0,pagerduty,algoliasearch,mlflow,meilisearch,github,okta,chromadb,wandb,datadog-api-client,postmarker,simple-salesforce,zenpy,notion-client,dropbox,asana,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain,newrelic,rollbar,honeybadger,elastic-apm,bugsnag,structlog,loguru,aiohttp-server]",
+    "whytrail[requests,httpx,aiohttp,huggingface-hub,openai,anthropic,boto3,google-cloud,sqlalchemy,asyncpg,pymongo,grpcio,pydantic,marshmallow,jsonschema,pyyaml,pandas,polars,stripe,alembic,paramiko,elasticsearch,pika,kubernetes,azure-core,sendgrid,websockets,opensearch,pyodbc,google-genai,oracledb,confluent-kafka,pymysql,pymssql,clickhouse,snowflake,graphql-core,tenacity,psycopg,cassandra,influxdb,pyzmq,zeep,pinecone,weaviate-client,qdrant-client,neo4j,cohere,mistralai,twilio,slack-sdk,plaid,docker,hvac,square,temporalio,dagster,discord-py,nats-py,firebase-admin,minio,arango,supabase,auth0,pagerduty,algoliasearch,mlflow,meilisearch,github,okta,chromadb,wandb,datadog-api-client,postmarker,simple-salesforce,zenpy,notion-client,dropbox,asana,groq,replicate,sentry,ddtrace,celery,rq,dramatiq,prefect,scrapy,pytest,fastapi,django,flask,langchain,newrelic,rollbar,honeybadger,elastic-apm,bugsnag,structlog,loguru,aiohttp-server]",
 ]
 
 dev = [
