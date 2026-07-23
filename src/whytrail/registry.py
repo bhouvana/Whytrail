@@ -73,6 +73,7 @@ _BUILTIN_EXPLAINERS = (
     "marshmallow",
     "jsonschema",
     "pyyaml",
+    "numpy",
     "pandas",
     "polars",
     "stripe",

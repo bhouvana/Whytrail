@@ -212,7 +212,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("library", help="the library to explain, e.g. 'requests_toolbelt' or 'airflow'")
     parser.add_argument("--kind", choices=["explainer", "integration"], required=True)
-    parser.add_argument("--type", dest="type_name", default="TODOException", help="(explainer only) the exception/type to register for")
+    parser.add_argument("--type", dest="type_name", default="TODOException",
+                        help="(explainer only) the exception/type to register for")
     parser.add_argument("--import-name", default=None, help="the module import name, if different from `library`")
     args = parser.parse_args()
 
