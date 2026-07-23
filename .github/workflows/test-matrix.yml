@@ -1,0 +1,54 @@
+name: Test Matrix (numpy optional dependency)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - name: "with numpy"
+            extras: "numpy"
+          - name: "without numpy"
+            extras: ""
+    
+    name: Python ${{ matrix.python-version }} (${{ matrix.name }})
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      
+      - name: Install whytrail with extras
+        if: matrix.extras != ''
+        run: |
+          pip install -e ".[${{ matrix.extras }}]"
+      
+      - name: Run tests (${{ matrix.name }})
+        run: |
+          pytest tests/ -q --tb=short
+      
+      - name: Verify import guard (no numpy)
+        if: matrix.extras == ''
+        run: |
+          python -c "import whytrail; import whytrail.integrations.numpy; print('✓ numpy integration gracefully disabled when numpy absent')"
+      
+      - name: Verify explainers work (with numpy)
+        if: matrix.extras == 'numpy'
+        run: |
+          python examples/ex_numpy_demo.py
